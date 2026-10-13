@@ -15,6 +15,7 @@ Usage examples (run from the repository root):
     python -m src.cli run-all            (add --skip-db when no PostgreSQL is running)
     python -m src.cli benchmark
     python -m src.cli partition-demo --year 2022 --month 6
+    python -m src.cli clean --yes        (delete generated data/state/logs for a fresh start)
 """
 
 from __future__ import annotations
@@ -29,12 +30,13 @@ from pathlib import Path
 
 from src.config import Settings, load_settings
 from src.contract import verify_source
-from src.errors import PipelineError
+from src.errors import ConfigError, PipelineError
 from src.ingest import Checkpoint, clear_raw_layer, raw_status
 from src.observability import RunRecord, resolve_run_id, setup_logging
 from src.pipeline import PIPELINE_ORDER, finalize_run, run_all, run_stage
 from src.profiling import profile_source, write_profile
 from src.storage import connect
+from src.train import MODEL_FILES
 
 
 # ---------------------------------------------------------------------------
@@ -151,6 +153,55 @@ def cmd_reset(args: argparse.Namespace, settings: Settings) -> int:
         shutil.rmtree(runs_dir)
     settings.checkpoint_file.unlink(missing_ok=True)
     print(f"Removed {removed} raw batch folder(s) and the checkpoint. data/source/ was not touched.")
+    return 0
+
+
+def _empty_folder(folder: Path) -> int:
+    """Delete everything inside ``folder`` except the .gitkeep placeholder."""
+    if not folder.is_dir():
+        return 0
+    removed = 0
+    for entry in sorted(folder.iterdir()):
+        if entry.name == ".gitkeep":
+            continue
+        if entry.is_dir() and not entry.is_symlink():
+            shutil.rmtree(entry)
+        else:
+            entry.unlink()
+        removed += 1
+    return removed
+
+
+def cmd_clean(args: argparse.Namespace, settings: Settings) -> int:
+    """Delete every locally generated artifact so the next run starts from an empty state.
+
+    Kept: data/source/, metadata/, the committed outputs (metrics.json, predictions.csv,
+    model_card.json, ...) and the .gitkeep placeholders. PostgreSQL is not touched here;
+    reset it with ``docker compose down -v`` (see docs/runbook.md).
+    """
+    folders = [settings.raw_dir, settings.staging_dir, settings.curated_dir, settings.partitioned_dir,
+               settings.quarantine_dir, settings.model_input_dir, settings.state_dir, settings.runs_dir,
+               settings.quality_dir, settings.benchmark_dir / "files", settings.outputs_dir / "drills"]
+    files = [settings.model_dir / name for name in MODEL_FILES.values()]
+    files += sorted(settings.logs_dir.glob("*.jsonl*"))
+    if not args.yes:
+        print("This deletes the generated data layers (raw, staging, curated, partitioned, quarantine,\n"
+              "model_input), the checkpoint, run records, quality reports, trained model files and the\n"
+              "pipeline logs. data/source/, metadata/ and the committed outputs are kept.\n"
+              "Run again with --yes to confirm.")
+        return 1
+    source = settings.source_file.resolve()
+    for folder in folders:          # protects against a mistyped PIPELINE_*_DIR setting
+        target = folder.resolve()
+        if target == settings.root.resolve() or source.is_relative_to(target):
+            raise ConfigError(f"Refusing to clean {folder}: it contains the project or the source data.")
+    removed = sum(_empty_folder(folder) for folder in folders)
+    for path in files:
+        if path.is_file():
+            path.unlink()
+            removed += 1
+    print(f"Removed {removed} generated item(s). data/source/, metadata/ and the committed outputs were kept.\n"
+          "PostgreSQL still holds the loaded tables; reset it with: docker compose down -v")
     return 0
 
 
@@ -272,6 +323,10 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("reset-raw", help="delete the raw layer and the checkpoint (keeps data/source)")
     p.add_argument("--yes", action="store_true", help="confirm the deletion")
     p.set_defaults(func=cmd_reset)
+
+    p = sub.add_parser("clean", help="delete generated data layers, state, run records, models and logs")
+    p.add_argument("--yes", action="store_true", help="confirm the deletion")
+    p.set_defaults(func=cmd_clean)
 
     p = sub.add_parser("validate", help="run the data-quality checks of one layer")
     p.add_argument("--layer", choices=["raw", "curated"], required=True)

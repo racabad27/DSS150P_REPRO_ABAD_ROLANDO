@@ -84,6 +84,9 @@ services:
       AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "true"
     # Same user id as the pipeline container so both can rewrite the files.
     user: "${AIRFLOW_UID:-50000}:0"
+    # `docker compose exec airflow ...` starts in the project folder, e.g.
+    #   docker compose exec airflow python -m pytest tests/test_dag.py
+    working_dir: /opt/project
     ports:
       - "${AIRFLOW_HOST_PORT:-8080}:8080"
     volumes:

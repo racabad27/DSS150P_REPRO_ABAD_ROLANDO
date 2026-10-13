@@ -131,6 +131,25 @@ def test_postgres_load_is_rerun_safe(pg_workspace):
     assert report["quality"]["failed"] == 0
 
 
+def test_clean_removes_generated_files_but_keeps_the_source(workspace):
+    from argparse import Namespace
+
+    from src.cli import cmd_clean
+
+    for stage in FILE_STAGES:
+        run_stage(stage, workspace, "run_a")
+    (workspace.raw_dir / ".gitkeep").touch()
+    assert cmd_clean(Namespace(yes=False), workspace) == 1          # asks for confirmation first
+    assert curated_path(workspace).exists()
+
+    assert cmd_clean(Namespace(yes=True), workspace) == 0
+    assert workspace.source_file.is_file()                          # the source is never touched
+    assert [p.name for p in workspace.raw_dir.iterdir()] == [".gitkeep"]
+    assert not staging_path(workspace).exists() and not curated_path(workspace).exists()
+    assert not workspace.checkpoint_file.exists()
+    assert Checkpoint(workspace.checkpoint_file).load()["committed_batches"] == {}
+
+
 def test_cli_entry_point_runs():
     result = subprocess.run([sys.executable, "-m", "src.cli", "--help"], cwd=PROJECT_ROOT,
                             capture_output=True, text=True)

@@ -77,7 +77,7 @@ python -m src.cli run-all --skip-db   # same pipeline without the database steps
 
 ```bash
 docker compose run --rm pipeline pytest                     # unit + integration + data-quality tests
-docker compose exec -w /opt/project airflow python -m pytest tests/test_dag.py   # DAG structure
+docker compose exec airflow python -m pytest tests/test_dag.py                   # DAG structure
 docker compose run --rm pipeline python scripts/failure_drill.py                 # failure injection evidence
 ```
 
