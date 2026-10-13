@@ -1,0 +1,14 @@
+{
+  "partition": "reading_year=2022/reading_month=6",
+  "files_read": [
+    "partitioned/fire_risk_curated/reading_year=2022/reading_month=6/part-0.parquet"
+  ],
+  "files_in_dataset": 35,
+  "rows_from_partition": 2836,
+  "rows_expected_from_full_curated": 2836,
+  "partition_read_s_median": 0.0053,
+  "full_file_scan_s_median": 0.0761,
+  "timing_repeats": 5,
+  "rows_in_postgres": 2836,
+  "row_counts_agree": true
+}

@@ -1,0 +1,113 @@
+{
+  "pipeline_run_id": "run_20261013T120355Z_45fde3",
+  "generated_at_utc": "2026-10-13T12:04:22.994Z",
+  "dataset": {
+    "name": "curated business view",
+    "rows": 98000,
+    "columns": 29,
+    "note": "pipeline audit columns (hashes, run ids) are not part of the benchmark copy"
+  },
+  "method": {
+    "write_repeats": 3,
+    "read_repeats": 5,
+    "first_read_excluded_from_median": true,
+    "first_read_note": "the first read follows the write, so the OS page cache is already warm; it is reported separately, not as a true cold-cache read",
+    "selective_filter": "factory = 'Factory_B' AND reading_ts >= '2023-01-01 00:00:00'"
+  },
+  "machine": {
+    "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.41",
+    "python": "3.12.15",
+    "cpu_count": 16,
+    "pandas": "3.0.5",
+    "pyarrow": "25.0.1",
+    "inside_docker": true
+  },
+  "results": [
+    {
+      "format": "CSV",
+      "path": "fire_risk_curated.csv",
+      "size_bytes": 16129898,
+      "write_s_median": 1.2751,
+      "first_read_s": 0.2283,
+      "read_s_median": 0.2009,
+      "read_s_min": 0.1917,
+      "read_s_max": 0.2171,
+      "selective_read_s_median": 0.1982,
+      "selective_rows": 7373,
+      "same_logical_records": true,
+      "signature": {
+        "rows": 98000,
+        "columns": 29,
+        "source_row_key_sum": 4901386269,
+        "risk_sum": 4755451.57,
+        "first_reading_ts": "2021-01-01 00:00:00"
+      }
+    },
+    {
+      "format": "JSONL",
+      "path": "fire_risk_curated.jsonl",
+      "size_bytes": 52930082,
+      "write_s_median": 0.6404,
+      "first_read_s": 1.216,
+      "read_s_median": 1.0652,
+      "read_s_min": 1.0312,
+      "read_s_max": 1.1025,
+      "selective_read_s_median": 1.0284,
+      "selective_rows": 7373,
+      "same_logical_records": true,
+      "signature": {
+        "rows": 98000,
+        "columns": 29,
+        "source_row_key_sum": 4901386269,
+        "risk_sum": 4755451.57,
+        "first_reading_ts": "2021-01-01 00:00:00"
+      }
+    },
+    {
+      "format": "Parquet (snappy)",
+      "path": "fire_risk_curated.parquet",
+      "size_bytes": 5237417,
+      "write_s_median": 0.1796,
+      "first_read_s": 0.0317,
+      "read_s_median": 0.0273,
+      "read_s_min": 0.0248,
+      "read_s_max": 0.03,
+      "selective_read_s_median": 0.0278,
+      "selective_rows": 7373,
+      "same_logical_records": true,
+      "signature": {
+        "rows": 98000,
+        "columns": 29,
+        "source_row_key_sum": 4901386269,
+        "risk_sum": 4755451.57,
+        "first_reading_ts": "2021-01-01 00:00:00"
+      }
+    },
+    {
+      "format": "PostgreSQL 16 table",
+      "path": "bench.fire_risk_curated",
+      "size_bytes": 24682496,
+      "table_bytes_without_indexes": 20643840,
+      "write_s_median": 0.5326,
+      "write_note": "CREATE TABLE + COPY + CREATE INDEX + ANALYZE",
+      "first_read_s": 0.6247,
+      "read_s_median": 0.5936,
+      "read_s_min": 0.5933,
+      "read_s_max": 0.6734,
+      "selective_read_s_median": 0.0399,
+      "selective_rows": 7373,
+      "aggregate_query_s_median": 0.018,
+      "aggregate_groups": 140,
+      "selective_query_plan": "Bitmap Heap Scan on fire_risk_curated  (cost=223.37..2853.05 rows=7312 width=162)\n  Recheck Cond: ((factory = 'Factory_B'::text) AND (reading_ts >= '2023-01-01 00:00:00'::timestamp without time zone))\n  ->  Bitmap Index Scan on fire_risk_curated_factory_reading_ts_idx  (cost=0.00..221.54 rows=7312 width=0)\n        Index Cond: ((factory = 'Factory_B'::text) AND (reading_ts >= '2023-01-01 00:00:00'::timestamp without time zone))",
+      "server_version": "16.15",
+      "same_logical_records": true,
+      "signature": {
+        "rows": 98000,
+        "columns": 29,
+        "source_row_key_sum": 4901386269,
+        "risk_sum": 4755451.57,
+        "first_reading_ts": "2021-01-01 00:00:00"
+      }
+    }
+  ]
+}

@@ -35,6 +35,13 @@ docker compose exec postgres psql -U firerisk -d firerisk -c "SELECT * FROM audi
 docker compose exec postgres psql -U firerisk -d firerisk -c "SELECT * FROM audit.v_run_overview;"
 ```
 
+Storage benchmark and partition demo (results in `docs/benchmark_report.md`):
+
+```bash
+docker compose run --rm pipeline python -m src.cli benchmark
+docker compose run --rm pipeline python -m src.cli partition-demo --year 2022 --month 6
+```
+
 ## 3. Run with a local virtual environment
 
 ```bash

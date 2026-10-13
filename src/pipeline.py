@@ -13,6 +13,7 @@ from typing import Any, Callable
 
 import pandas as pd
 
+from src.benchmark import partition_demo, run_benchmark
 from src.config import Settings
 from src.contract import load_contract
 from src.errors import ConfigError, DataQualityError
@@ -162,6 +163,25 @@ def validate_curated(settings: Settings, run_id: str, log: StageLogger, result: 
     result.counts["curated_rows"] = int(len(curated))
     result.details["quality"] = report.summary()
     return {"curated_rows": int(len(curated)), "database_checked": check_database, "quality": report.summary()}
+
+
+@stage("benchmark_storage")
+def benchmark_storage(settings: Settings, run_id: str, log: StageLogger, result: StageResult, **_: Any) -> dict:
+    """Optional experiment (not part of run-all): CSV vs JSONL vs Parquet vs PostgreSQL."""
+    report = run_benchmark(settings, run_id, log)
+    result.details["formats"] = {r["format"]: {"size_bytes": r["size_bytes"], "read_s_median": r["read_s_median"]}
+                                 for r in report["results"]}
+    return report
+
+
+@stage("partition_demo")
+def partition_demo_stage(settings: Settings, run_id: str, log: StageLogger, result: StageResult,
+                         year: int | None = None, month: int | None = None,
+                         check_database: bool = True, **_: Any) -> dict:
+    """Optional: read one partition only and verify its row count."""
+    summary = partition_demo(settings, run_id, log, year=year, month=month, check_database=check_database)
+    result.details.update(summary)
+    return summary
 
 
 def run_stage(name: str, settings: Settings, run_id: str, **params: Any) -> dict:

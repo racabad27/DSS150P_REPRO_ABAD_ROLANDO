@@ -12,6 +12,8 @@ Usage examples (run from the repository root):
     python -m src.cli build-curated
     python -m src.cli load-postgres
     python -m src.cli run-all            (add --skip-db when no PostgreSQL is running)
+    python -m src.cli benchmark
+    python -m src.cli partition-demo --year 2022 --month 6
 """
 
 from __future__ import annotations
@@ -206,6 +208,28 @@ def cmd_run_all(args: argparse.Namespace, settings: Settings) -> int:
     return 0
 
 
+def cmd_benchmark(args: argparse.Namespace, settings: Settings) -> int:
+    run_id = resolve_run_id(args.run_id)
+    report = run_stage("benchmark_storage", settings, run_id)
+    RunRecord(settings, run_id).set_status("success")
+    print(f"\n{'Format':<22}{'Size MB':>9}{'Write s':>9}{'Read s (median)':>17}{'Selective s':>13}  Same records")
+    for r in report["results"]:
+        print(f"{r['format']:<22}{r['size_bytes'] / 1e6:>9.2f}{r['write_s_median']:>9.3f}"
+              f"{r['read_s_median']:>17.3f}{r['selective_read_s_median']:>13.3f}  {r['same_logical_records']}")
+    print(f"\nDetails: {settings.benchmark_dir / 'benchmark_results.json'} and docs/benchmark_report.md")
+    return 0
+
+
+def cmd_partition_demo(args: argparse.Namespace, settings: Settings) -> int:
+    run_id = resolve_run_id(args.run_id)
+    result = run_stage("partition_demo", settings, run_id, year=args.year, month=args.month,
+                       check_database=not args.skip_db)
+    RunRecord(settings, run_id).set_status("success")
+    for key, value in result.items():
+        print(f"  {key:<32}: {value}")
+    return 0
+
+
 # ---------------------------------------------------------------------------
 # argument parsing
 # ---------------------------------------------------------------------------
@@ -259,6 +283,17 @@ def build_parser() -> argparse.ArgumentParser:
         p = sub.add_parser(name, help=text)
         p.add_argument("--run-id", help="pipeline run id (default: generated)")
         p.set_defaults(func=_run_single(stage_name))
+
+    p = sub.add_parser("benchmark", help="compare CSV, JSONL, Parquet and PostgreSQL on the curated data")
+    p.add_argument("--run-id", help="pipeline run id (default: generated)")
+    p.set_defaults(func=cmd_benchmark)
+
+    p = sub.add_parser("partition-demo", help="read one month partition only and verify its row count")
+    p.add_argument("--year", type=int, help="partition year (default from settings.yml)")
+    p.add_argument("--month", type=int, help="partition month 1-12 (default from settings.yml)")
+    p.add_argument("--skip-db", action="store_true", help="do not compare with PostgreSQL")
+    p.add_argument("--run-id", help="pipeline run id (default: generated)")
+    p.set_defaults(func=cmd_partition_demo)
 
     p = sub.add_parser("run-all", help="run every stage in order: " + " -> ".join(PIPELINE_ORDER))
     p.add_argument("--mode", choices=["incremental", "full"], default="incremental")

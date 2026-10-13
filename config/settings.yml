@@ -1,10 +1,13 @@
-# Pipeline configuration
-#   Paths are RELATIVE to the repository root, so the project runs from any
+# =============================================================================
+# Pipeline configuration (committed to Git).
+#
+# - Paths are RELATIVE to the repository root, so the project runs from any
 #   folder on any machine (no C:\Users\... or /Users/... paths anywhere).
-#   Values written as ${NAME:-default} come from an environment variable (or
+# - Values written as ${NAME:-default} come from an environment variable (or
 #   the .env file) when it is set, otherwise the default after ":-" is used.
 #   Secrets (passwords) only ever come from the environment.
-# Changing a value here changes the pipeline WITHOUT editing Python code.
+# - Changing a value here changes the pipeline WITHOUT editing Python code.
+# =============================================================================
 
 project:
   name: dss150p-fire-risk-repro
@@ -120,8 +123,9 @@ database:
   connect_timeout_s: 10
 
 benchmark:
+  write_repeats: 3             # each write is repeated 3 times and the median reported
   read_repeats: 5              # each read is repeated 5 times and the median reported
-  warmup_runs: 1               # an extra first (cold) read, reported separately
+  warmup_runs: 1               # an extra first read, reported separately (not in the median)
   postgres_table: bench.fire_risk_curated
   selective_filter:
     factory: Factory_B
