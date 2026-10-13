@@ -10,7 +10,8 @@ Usage examples (run from the repository root):
     python -m src.cli status
     python -m src.cli transform
     python -m src.cli build-curated
-    python -m src.cli run-all
+    python -m src.cli load-postgres
+    python -m src.cli run-all            (add --skip-db when no PostgreSQL is running)
 """
 
 from __future__ import annotations
@@ -27,9 +28,10 @@ from src.config import Settings, load_settings
 from src.contract import verify_source
 from src.errors import PipelineError
 from src.ingest import Checkpoint, clear_raw_layer, raw_status
-from src.observability import resolve_run_id, setup_logging
+from src.observability import RunRecord, resolve_run_id, setup_logging
 from src.pipeline import PIPELINE_ORDER, run_all, run_stage
 from src.profiling import profile_source, write_profile
+from src.storage import connect
 
 
 # ---------------------------------------------------------------------------
@@ -67,6 +69,13 @@ def cmd_env_check(args: argparse.Namespace, settings: Settings) -> int:
         print(f"  {warning}")
     source_present = settings.source_file.is_file()
     print(f"\nSource file present: {'yes' if source_present else 'NO - see data/source/README.md'}")
+    if args.check_db:
+        try:
+            with connect(settings, attempts=1) as conn:
+                version = conn.execute("SHOW server_version").fetchone()[0]
+            print(f"PostgreSQL reachable: yes (server {version})")
+        except PipelineError as exc:
+            print(f"PostgreSQL reachable: NO - {str(exc).splitlines()[0]}")
     if mismatches:
         print(f"\n{mismatches} package(s) differ from requirements.txt. Results may not "
               "match the baseline; install with: pip install -r requirements.txt")
@@ -110,8 +119,13 @@ def cmd_profile(args: argparse.Namespace, settings: Settings) -> int:
 # ---------------------------------------------------------------------------
 def cmd_ingest(args: argparse.Namespace, settings: Settings) -> int:
     run_id = resolve_run_id(args.run_id)
-    summary = run_stage("ingest_source", settings, run_id, mode=args.mode,
-                        max_batches=args.max_batches, fail_after_batches=args.fail_after_batches)
+    try:
+        summary = run_stage("ingest_source", settings, run_id, mode=args.mode,
+                            max_batches=args.max_batches, fail_after_batches=args.fail_after_batches)
+    except BaseException:
+        RunRecord(settings, run_id).set_status("failed")
+        raise
+    RunRecord(settings, run_id).set_status("success" if summary["coverage"] >= 1 else "partial")
     print(f"\nRun id               : {run_id}")
     print(f"Batches written now  : {summary['batches_written_this_run']} "
           f"({summary['rows_written_this_run']:,} rows)")
@@ -157,10 +171,16 @@ def cmd_status(args: argparse.Namespace, settings: Settings) -> int:
 # ---------------------------------------------------------------------------
 # single stages and the whole pipeline
 # ---------------------------------------------------------------------------
-def _run_single(stage_name: str):
+def _run_single(stage_name: str, **params):
     def command(args: argparse.Namespace, settings: Settings) -> int:
         run_id = resolve_run_id(args.run_id)
-        summary = run_stage(stage_name, settings, run_id)
+        try:
+            summary = run_stage(stage_name, settings, run_id, **params)
+        except BaseException:
+            RunRecord(settings, run_id).set_status("failed")
+            raise
+        stage_status = RunRecord(settings, run_id).load()["stages"][stage_name]["status"]
+        RunRecord(settings, run_id).set_status("partial" if stage_status == "partial" else "success")
         print(f"\n{stage_name} finished for run {run_id}")
         for key, value in summary.items():
             if not isinstance(value, (dict, list)):
@@ -171,13 +191,14 @@ def _run_single(stage_name: str):
 
 def cmd_validate(args: argparse.Namespace, settings: Settings) -> int:
     stage_name = {"raw": "validate_raw", "curated": "validate_curated"}[args.layer]
-    return _run_single(stage_name)(args, settings)
+    params = {"check_database": False} if args.layer == "curated" and args.skip_db else {}
+    return _run_single(stage_name, **params)(args, settings)
 
 
 def cmd_run_all(args: argparse.Namespace, settings: Settings) -> int:
     run_id = resolve_run_id(args.run_id)
     record = run_all(settings, run_id, mode=args.mode, max_batches=args.max_batches,
-                     fail_after_batches=args.fail_after_batches)
+                     fail_after_batches=args.fail_after_batches, skip_db=args.skip_db)
     print(f"\nRun {run_id} finished with status: {record['status'].upper()}")
     for key, value in record["counts"].items():
         print(f"  {key:<24}: {value:,}" if isinstance(value, int) else f"  {key:<24}: {value}")
@@ -197,6 +218,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("env-check", help="check Python/package versions and the resolved config")
     p.add_argument("--strict", action="store_true", help="exit 1 if any package differs from the pins")
+    p.add_argument("--check-db", action="store_true", help="also try to connect to PostgreSQL")
     p.set_defaults(func=cmd_env_check)
 
     p = sub.add_parser("verify-source", help="check the source CSV against source_manifest.yml")
@@ -225,12 +247,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("validate", help="run the data-quality checks of one layer")
     p.add_argument("--layer", choices=["raw", "curated"], required=True)
+    p.add_argument("--skip-db", action="store_true", help="curated only: do not compare with PostgreSQL")
     p.add_argument("--run-id", help="pipeline run id (default: generated)")
     p.set_defaults(func=cmd_validate)
 
     for name, stage_name, text in [
         ("transform", "transform_staging", "build the staging layer from raw (+ quarantine)"),
         ("build-curated", "build_curated", "build the curated layer and its partitions from staging"),
+        ("load-postgres", "load_postgres", "load staging + curated into PostgreSQL (rerun-safe upsert)"),
     ]:
         p = sub.add_parser(name, help=text)
         p.add_argument("--run-id", help="pipeline run id (default: generated)")
@@ -240,6 +264,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--mode", choices=["incremental", "full"], default="incremental")
     p.add_argument("--max-batches", type=int, help="ingest at most N new batches in this run")
     p.add_argument("--fail-after-batches", type=int, help="failure drill for the ingestion stage")
+    p.add_argument("--skip-db", action="store_true",
+                   help="run without PostgreSQL (skips load_postgres and the database checks)")
     p.add_argument("--run-id", help="pipeline run id (default: generated)")
     p.set_defaults(func=cmd_run_all)
     return parser

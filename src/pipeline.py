@@ -8,16 +8,20 @@ line or by Airflow. ``run_all`` runs the stages in order for one run id.
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Callable
 
 import pandas as pd
-import pyarrow.parquet as pq
 
 from src.config import Settings
 from src.contract import load_contract
 from src.errors import ConfigError, DataQualityError
 from src.ingest import Checkpoint, ingest, read_raw
-from src.observability import RunRecord, StageLogger, StageResult, track_stage
+from src.observability import RunRecord, StageLogger, StageResult, setup_logging, track_stage
+from src.storage import (
+    CURATED_TABLE, STAGING_TABLE, connect, frame_fingerprint, load_postgres, scalar, sync_audit,
+    table_fingerprint,
+)
 from src.transform import (
     EXCLUSIONS_FILE, build_curated, build_staging, curated_path, staging_path,
 )
@@ -32,8 +36,10 @@ PIPELINE_ORDER = [
     "validate_raw",
     "transform_staging",
     "build_curated",
+    "load_postgres",
     "validate_curated",
 ]
+DATABASE_STAGES = {"load_postgres"}
 
 
 def stage(name: str) -> Callable[[StageFunction], StageFunction]:
@@ -106,22 +112,56 @@ def build_curated_stage(settings: Settings, run_id: str, log: StageLogger, resul
     return summary
 
 
+@stage("load_postgres")
+def load_postgres_stage(settings: Settings, run_id: str, log: StageLogger, result: StageResult, **_: Any) -> dict:
+    summary = load_postgres(settings, run_id, log)
+    for table in summary["tables"]:
+        result.details[table["table"]] = {k: v for k, v in table.items() if k != "table"}
+    result.details["audit"] = summary["audit"]
+    return summary
+
+
 @stage("validate_curated")
-def validate_curated(settings: Settings, run_id: str, log: StageLogger, result: StageResult, **_: Any) -> dict:
-    """Re-check the PUBLISHED curated file (what downstream will actually read)."""
+def validate_curated(settings: Settings, run_id: str, log: StageLogger, result: StageResult,
+                     check_database: bool = True, **_: Any) -> dict:
+    """Re-check the PUBLISHED curated file and reconcile it with PostgreSQL."""
     if not curated_path(settings).is_file():
         raise DataQualityError("No curated data. Run `python -m src.cli build-curated` first.")
     curated = pd.read_parquet(curated_path(settings))
-    staging_rows = pq.ParquetFile(staging_path(settings)).metadata.num_rows
+    staging = pd.read_parquet(staging_path(settings), columns=["source_row_key", "reading_ts", "row_hash"])
     excluded = len(pd.read_csv(settings.curated_dir / EXCLUSIONS_FILE))
-    report = validate_curated_frame(curated, settings, run_id, staging_rows=staging_rows, excluded_rows=excluded)
+    report = validate_curated_frame(curated, settings, run_id, staging_rows=len(staging), excluded_rows=excluded)
     report.layer = "curated_published"
+    if check_database:
+        with connect(settings, log) as conn:
+            for table, frame in ((CURATED_TABLE, curated), (STAGING_TABLE, staging)):
+                in_db, in_file = table_fingerprint(conn, settings, table), frame_fingerprint(frame)
+                name = table.split(".")[0]
+                report.check(f"db_{name}_row_count", "consistency", f"{table} has the same row count as the file",
+                             in_db["row_count"] == in_file["row_count"],
+                             observed=in_db["row_count"], expected=in_file["row_count"])
+                report.check(f"db_{name}_no_duplicate_keys", "uniqueness",
+                             f"{table} has no duplicate reading_ts",
+                             in_db["row_count"] == in_db["distinct_reading_ts"],
+                             observed=in_db["row_count"] - in_db["distinct_reading_ts"], expected=0)
+                report.check(f"db_{name}_content_matches_file", "consistency",
+                             f"{table} content digest equals the Parquet file digest",
+                             in_db["row_hash_digest"] == in_file["row_hash_digest"],
+                             observed=in_db["row_hash_digest"][:16], expected=in_file["row_hash_digest"][:16])
+            missing = scalar(conn, settings, "curated_missing_in_staging")
+            report.check("db_referential_curated_in_staging", "consistency",
+                         "Every curated reading exists in staging (referential rule)",
+                         missing == 0, observed=missing, expected=0, failing_rows=missing)
+            mismatches = scalar(conn, settings, "curated_feature_mismatches")
+            report.check("db_sql_recomputed_features", "consistency",
+                         "Derived features recomputed in SQL equal the stored values",
+                         mismatches == 0, observed=mismatches, expected=0, failing_rows=mismatches)
     report.save(settings)
     report.log_results(log)
     report.raise_if_failed()
     result.counts["curated_rows"] = int(len(curated))
     result.details["quality"] = report.summary()
-    return {"curated_rows": int(len(curated)), "quality": report.summary()}
+    return {"curated_rows": int(len(curated)), "database_checked": check_database, "quality": report.summary()}
 
 
 def run_stage(name: str, settings: Settings, run_id: str, **params: Any) -> dict:
@@ -132,19 +172,34 @@ def run_stage(name: str, settings: Settings, run_id: str, **params: Any) -> dict
         return STAGES[name](settings, run_id, log, result, **params)
 
 
+def _finish_run(settings: Settings, run_id: str, status: str, use_database: bool) -> dict:
+    """Store the final run status and copy the run history into PostgreSQL (best effort)."""
+    record = RunRecord(settings, run_id).set_status(status)
+    if use_database:
+        log = setup_logging(settings, run_id, "finish_run")
+        try:
+            with connect(settings, log, attempts=1) as conn:
+                sync_audit(conn, settings)
+        except Exception as exc:  # noqa: BLE001 - the run result must not depend on this
+            log.event("audit_sync_skipped", f"Run record not synced to PostgreSQL: {exc}", level=logging.WARNING)
+    return record
+
+
 def run_all(settings: Settings, run_id: str, mode: str = "incremental", max_batches: int | None = None,
-            fail_after_batches: int | None = None) -> dict:
+            fail_after_batches: int | None = None, skip_db: bool = False) -> dict:
     """Run every stage in order under one run id; stop early on a partial ingestion."""
-    record = RunRecord(settings, run_id)
     try:
         run_stage("ingest_source", settings, run_id, mode=mode, max_batches=max_batches,
                   fail_after_batches=fail_after_batches)
         raw_check = run_stage("validate_raw", settings, run_id)
         if not raw_check["complete"]:
-            return record.set_status("partial")
+            return _finish_run(settings, run_id, "partial", not skip_db)
         for name in PIPELINE_ORDER[2:]:
-            run_stage(name, settings, run_id)
+            if skip_db and name in DATABASE_STAGES:
+                continue
+            params = {"check_database": False} if skip_db and name == "validate_curated" else {}
+            run_stage(name, settings, run_id, **params)
     except BaseException:
-        record.set_status("failed")
+        _finish_run(settings, run_id, "failed", not skip_db)
         raise
-    return record.set_status("success")
+    return _finish_run(settings, run_id, "success", not skip_db)

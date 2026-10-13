@@ -28,6 +28,13 @@ docker compose run --rm pipeline               # runs: python -m src.cli run-all
 docker compose run --rm pipeline python -m src.cli status
 ```
 
+Look at the loaded tables (the second run must report 0 inserted / 0 updated):
+
+```bash
+docker compose exec postgres psql -U firerisk -d firerisk -c "SELECT * FROM audit.v_duplicate_check;"
+docker compose exec postgres psql -U firerisk -d firerisk -c "SELECT * FROM audit.v_run_overview;"
+```
+
 ## 3. Run with a local virtual environment
 
 ```bash
@@ -35,7 +42,8 @@ python -m venv .venv
 # Windows: .venv\Scripts\activate      macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
 python -m src.cli env-check     # Python/package versions and the resolved config
-python -m src.cli run-all       # ingest -> validate -> staging -> curated
+python -m src.cli run-all       # needs PostgreSQL on POSTGRES_HOST/PORT from .env
+python -m src.cli run-all --skip-db   # same pipeline without the database steps
 ```
 
 ## Repository layout (target)
