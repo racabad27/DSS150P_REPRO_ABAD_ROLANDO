@@ -353,7 +353,7 @@ touching any file:
 
 | | |
 |---|---|
-| Student | Abad, Rolando Alfonso — student number *(2022136475)*, section *(CM17)* |
+| Student | Abad, Rolando Alfonso — student number 2022136475, section CM17 |
 | Course | DSS150P Fundamentals of Data Engineering, Integrated Individual Laboratory Activity #4 |
 | Previous group project | Risma, V. L. S.; Abad, R. A.; Toliba, M. G. — *Integrating IIoT Telemetry and Machine Health Indicators for Dynamic Fire Hazard Assessment* |
 | Dataset | *Industrial Fire and Accident Risk Predictor* by Kaggle user "joganimitesh" |
