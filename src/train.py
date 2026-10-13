@@ -49,7 +49,13 @@ from src.storage import CURATED_TABLE, connect, frame_fingerprint
 from src.transform import curated_path
 from src.validate import QualityReport
 
-MODEL_FILE = "{name}.joblib"
+# XGBoost is saved in its own JSON format: a joblib/pickle file of an
+# XGBRegressor written inside Airflow referenced the `dill` package (Airflow
+# imports it and it hooks into pickling), so it could not be loaded by the
+# pipeline image. The native format is portable and independent of pickle.
+MODEL_FILES = {"linear_regression": "linear_regression.joblib",
+               "random_forest": "random_forest.joblib",
+               "xgboost": "xgboost.json"}
 TRAIN_FILE = "train.parquet"
 TEST_FILE = "test.parquet"
 KEY_COLUMNS = ["source_row_key", "reading_ts"]
@@ -224,7 +230,22 @@ def set_global_seeds(seed: int) -> None:
 
 
 def model_path(settings: Settings, name: str) -> Path:
-    return settings.model_dir / MODEL_FILE.format(name=name)
+    return settings.model_dir / MODEL_FILES[name]
+
+
+def save_model(model, path: Path) -> None:
+    if isinstance(model, XGBRegressor):
+        model.save_model(path)                      # native JSON format
+    else:
+        joblib.dump(model, path, compress=3)
+
+
+def load_model(name: str, path: Path):
+    if name == "xgboost":
+        model = XGBRegressor()
+        model.load_model(path)
+        return model
+    return joblib.load(path)
 
 
 def _sha256(path: Path) -> str:
@@ -309,15 +330,16 @@ def train_models(settings: Settings, run_id: str, log: StageLogger, input_source
         "random_seed": seed,
         "libraries": {"scikit-learn": sklearn.__version__, "xgboost": xgboost.__version__,
                       "pandas": pd.__version__, "numpy": np.__version__},
-        "note": "Model binaries are not committed (the Random Forest file is about 150 MB); "
-                "rerun `python -m src.cli train` to recreate them, then compare the SHA-256 below.",
+        "note": "Model files are not committed (the Random Forest file is about 150 MB); "
+                "rerun `python -m src.cli train` to recreate them, then compare the SHA-256 below. "
+                "scikit-learn models are joblib files, XGBoost uses its native JSON format.",
         "models": {},
     }
     for name in settings.get("model.models"):
         model = make_model(name, settings)
         model.fit(X_train, y_train)
         path = model_path(settings, name)
-        joblib.dump(model, path, compress=3)
+        save_model(model, path)
         params = {k: v for k, v in model.get_params().items() if not callable(v)}
         card["models"][name] = {
             "class": f"{type(model).__module__}.{type(model).__name__}",

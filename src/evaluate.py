@@ -24,7 +24,6 @@ from importlib import metadata
 from pathlib import Path
 from typing import Any
 
-import joblib
 import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
@@ -33,7 +32,7 @@ from sklearn.model_selection import TimeSeriesSplit
 from src.config import Settings
 from src.errors import DataQualityError, ReproducibilityError
 from src.observability import RunRecord, StageLogger, utc_now_iso
-from src.train import load_model_input, make_model, model_path, predict
+from src.train import load_model, load_model_input, make_model, model_path, predict
 
 DECIMALS = 10   # metrics are stored rounded so tiny float noise never changes the file
 
@@ -75,7 +74,7 @@ def evaluate_models(settings: Settings, run_id: str, log: StageLogger) -> dict[s
         path = model_path(settings, name)
         if not path.is_file():
             raise DataQualityError(f"Model file {path} is missing. Run `python -m src.cli train` first.")
-        model = joblib.load(path)
+        model = load_model(name, path)
         pred = predict(model, X_test)
         predictions[f"pred_{name}"] = pred
         results["test"][name] = _metrics(y_test.to_numpy(), pred)

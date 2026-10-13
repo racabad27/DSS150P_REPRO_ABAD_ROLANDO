@@ -37,7 +37,7 @@
     "pandas": "3.0.5",
     "numpy": "2.5.3"
   },
-  "note": "Model binaries are not committed (the Random Forest file is about 150 MB); rerun `python -m src.cli train` to recreate them, then compare the SHA-256 below.",
+  "note": "Model files are not committed (the Random Forest file is about 150 MB); rerun `python -m src.cli train` to recreate them, then compare the SHA-256 below. scikit-learn models are joblib files, XGBoost uses its native JSON format.",
   "models": {
     "linear_regression": {
       "class": "sklearn.linear_model._base.LinearRegression",
@@ -122,9 +122,9 @@
         "validate_parameters": null,
         "verbosity": null
       },
-      "file": "model/xgboost.joblib",
-      "file_sha256": "86e3170a36edcf123eb892b2b8bb512bac06c2d4a915447bb478ef554f1d341f",
-      "file_size_bytes": 151227
+      "file": "model/xgboost.json",
+      "file_sha256": "42dd9bb17b2706e2c3d5e49adacd4cfd7ced29b0ed8af4724e9bfb8f887903bf",
+      "file_size_bytes": 678448
     }
   }
 }
