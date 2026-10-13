@@ -105,3 +105,27 @@ FROM staging.fire_risk_readings
 UNION ALL
 SELECT 'curated.fire_risk_features', count(*), count(*) - count(DISTINCT reading_ts)
 FROM curated.fire_risk_features;
+
+CREATE OR REPLACE VIEW serving.v_predictions AS
+SELECT p.model_name,
+       p.reading_ts,
+       c.factory,
+       c.region,
+       p.actual_risk,
+       round(p.predicted_risk::numeric, 2) AS predicted_risk,
+       round(p.abs_error::numeric, 2)      AS abs_error,
+       p.pipeline_run_id
+FROM serving.risk_predictions AS p
+JOIN curated.fire_risk_features AS c USING (source_row_key);
+
+CREATE OR REPLACE VIEW audit.v_metric_comparison AS
+-- baseline (paper Table 2) next to every published run
+SELECT m.pipeline_run_id, m.model_name, m.metric_name,
+       r.baseline, m.metric_value AS reproduced,
+       round(abs(m.metric_value - r.baseline)::numeric, 6) AS abs_diff,
+       r.status
+FROM audit.model_metrics AS m
+JOIN audit.reproducibility_results AS r
+  ON r.pipeline_run_id = m.pipeline_run_id
+ AND r.check_id = 'paper.table2.' || m.model_name || '.' || m.metric_name
+WHERE m.eval_set = 'test';

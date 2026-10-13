@@ -11,6 +11,7 @@ Usage examples (run from the repository root):
     python -m src.cli transform
     python -m src.cli build-curated
     python -m src.cli load-postgres
+    python -m src.cli train | evaluate | repro-check | publish
     python -m src.cli run-all            (add --skip-db when no PostgreSQL is running)
     python -m src.cli benchmark
     python -m src.cli partition-demo --year 2022 --month 6
@@ -31,7 +32,7 @@ from src.contract import verify_source
 from src.errors import PipelineError
 from src.ingest import Checkpoint, clear_raw_layer, raw_status
 from src.observability import RunRecord, resolve_run_id, setup_logging
-from src.pipeline import PIPELINE_ORDER, run_all, run_stage
+from src.pipeline import PIPELINE_ORDER, finalize_run, run_all, run_stage
 from src.profiling import profile_source, write_profile
 from src.storage import connect
 
@@ -182,7 +183,10 @@ def _run_single(stage_name: str, **params):
             RunRecord(settings, run_id).set_status("failed")
             raise
         stage_status = RunRecord(settings, run_id).load()["stages"][stage_name]["status"]
-        RunRecord(settings, run_id).set_status("partial" if stage_status == "partial" else "success")
+        if stage_name == "publish_outputs":     # last stage: write run_summary.json + audit sync
+            finalize_run(settings, run_id, "success")
+        else:
+            RunRecord(settings, run_id).set_status("partial" if stage_status == "partial" else "success")
         print(f"\n{stage_name} finished for run {run_id}")
         for key, value in summary.items():
             if not isinstance(value, (dict, list)):
@@ -279,6 +283,10 @@ def build_parser() -> argparse.ArgumentParser:
         ("transform", "transform_staging", "build the staging layer from raw (+ quarantine)"),
         ("build-curated", "build_curated", "build the curated layer and its partitions from staging"),
         ("load-postgres", "load_postgres", "load staging + curated into PostgreSQL (rerun-safe upsert)"),
+        ("train", "train_model", "build the model input, split by time and train the three models"),
+        ("evaluate", "evaluate_model", "test metrics, cross-validation, predictions, importances"),
+        ("repro-check", "reproducibility_check", "compare metrics with metadata/expected_metrics.json"),
+        ("publish", "publish_outputs", "deliver predictions and metrics to PostgreSQL"),
     ]:
         p = sub.add_parser(name, help=text)
         p.add_argument("--run-id", help="pipeline run id (default: generated)")

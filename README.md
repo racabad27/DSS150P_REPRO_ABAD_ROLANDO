@@ -28,6 +28,11 @@ docker compose run --rm pipeline               # runs: python -m src.cli run-all
 docker compose run --rm pipeline python -m src.cli status
 ```
 
+`run-all` ends with the model stages: training from the curated PostgreSQL
+table, evaluation, the reproducibility check against
+`metadata/expected_metrics.json` and publishing. The side-by-side comparison
+with the original paper is written to `outputs/reproducibility_summary.md`.
+
 Look at the loaded tables (the second run must report 0 inserted / 0 updated):
 
 ```bash

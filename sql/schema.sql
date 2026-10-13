@@ -5,7 +5,9 @@
 --
 --   staging.*  typed copy of the staging layer          (one row per reading)
 --   curated.*  model-ready dataset with derived features (complete cases)
---   audit.*    run history, stage timings, quality results, ingestion batches
+--   serving.*  model predictions delivered to consumers
+--   audit.*    run history, stage timings, quality results, ingestion batches,
+--              model metrics and reproducibility results
 --
 -- CHECK constraints repeat the most important data-contract rules as a second
 -- line of defence: if a bad row ever slipped past the Python checks, the
@@ -14,6 +16,7 @@
 
 CREATE SCHEMA IF NOT EXISTS staging;
 CREATE SCHEMA IF NOT EXISTS curated;
+CREATE SCHEMA IF NOT EXISTS serving;
 CREATE SCHEMA IF NOT EXISTS audit;
 
 -- -----------------------------------------------------------------------------
@@ -162,4 +165,44 @@ CREATE TABLE IF NOT EXISTS audit.pipeline_errors (
     error_type        TEXT,
     error_message     TEXT,
     occurred_at_utc   TIMESTAMPTZ   NOT NULL DEFAULT now()
+);
+
+-- -----------------------------------------------------------------------------
+-- serving + model audit (written by the publish_outputs stage)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS serving.risk_predictions (
+    model_name        TEXT              NOT NULL,       -- linear_regression | random_forest | xgboost
+    source_row_key    BIGINT            NOT NULL,
+    reading_ts        TIMESTAMP         NOT NULL,
+    actual_risk       DOUBLE PRECISION  NOT NULL,
+    predicted_risk    DOUBLE PRECISION  NOT NULL,
+    abs_error         DOUBLE PRECISION  NOT NULL,
+    pipeline_run_id   TEXT              NOT NULL,
+    published_at_utc  TIMESTAMPTZ       NOT NULL,
+    PRIMARY KEY (model_name, source_row_key)          -- rerun-safe: one prediction per model and reading
+);
+
+CREATE TABLE IF NOT EXISTS audit.model_metrics (
+    pipeline_run_id   TEXT              NOT NULL,
+    model_name        TEXT              NOT NULL,
+    eval_set          TEXT              NOT NULL,       -- test | cv_average
+    metric_name       TEXT              NOT NULL,       -- mse | rmse | mae | r2
+    metric_value      DOUBLE PRECISION  NOT NULL,
+    PRIMARY KEY (pipeline_run_id, model_name, eval_set, metric_name)
+);
+
+CREATE TABLE IF NOT EXISTS audit.reproducibility_results (
+    pipeline_run_id   TEXT              NOT NULL,
+    check_id          TEXT              NOT NULL,
+    source            TEXT,
+    model_name        TEXT,
+    kind              TEXT,
+    metric_key        TEXT,
+    baseline          DOUBLE PRECISION,
+    reproduced        DOUBLE PRECISION,
+    abs_diff          DOUBLE PRECISION,
+    tolerance         DOUBLE PRECISION,
+    status            TEXT              NOT NULL CHECK (status IN ('pass', 'fail', 'accepted_deviation')),
+    blocking          BOOLEAN           NOT NULL,
+    PRIMARY KEY (pipeline_run_id, check_id)
 );

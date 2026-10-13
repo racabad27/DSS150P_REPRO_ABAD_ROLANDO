@@ -1,0 +1,258 @@
+{
+  "target": "risk",
+  "eval_set": "chronological test set (last 20% of readings)",
+  "rows": {
+    "train": 78400,
+    "test": 19600,
+    "cv_total": 98000
+  },
+  "primary": {
+    "model": "random_forest",
+    "metric": "rmse",
+    "value": 3.2356514516
+  },
+  "metric_definitions": {
+    "mse": "mean squared error",
+    "rmse": "square root of MSE",
+    "mae": "mean absolute error",
+    "r2": "coefficient of determination",
+    "cv_average": "mean of the 5 TimeSeriesSplit folds (average RMSE = mean of per-fold RMSE)"
+  },
+  "test": {
+    "linear_regression": {
+      "mse": 11.9186636914,
+      "rmse": 3.4523417692,
+      "mae": 2.7491960309,
+      "r2": 0.95187473
+    },
+    "random_forest": {
+      "mse": 10.4694403163,
+      "rmse": 3.2356514516,
+      "mae": 2.5736771327,
+      "r2": 0.957726415
+    },
+    "xgboost": {
+      "mse": 10.5665941068,
+      "rmse": 3.2506298016,
+      "mae": 2.587039565,
+      "r2": 0.9573341267
+    }
+  },
+  "cv": {
+    "linear_regression": {
+      "folds": {
+        "r2": [
+          0.9242422214,
+          0.9302287104,
+          0.933681798,
+          0.9393461321,
+          0.9424889713
+        ],
+        "mae": [
+          2.73638547,
+          2.7839561519,
+          2.7365959922,
+          2.7711150818,
+          2.7628990051
+        ],
+        "mse": [
+          11.8106013814,
+          12.1876049318,
+          11.7781121717,
+          12.0778361192,
+          12.0484250231
+        ],
+        "rmse": [
+          3.4366555518,
+          3.4910750396,
+          3.4319254321,
+          3.4753181321,
+          3.4710841279
+        ]
+      },
+      "average": {
+        "r2": 0.9339975666,
+        "mae": 2.7581903402,
+        "mse": 11.9805159254,
+        "rmse": 3.4612116567
+      }
+    },
+    "random_forest": {
+      "folds": {
+        "r2": [
+          0.7597569214,
+          0.9387533678,
+          0.9414391022,
+          0.9470686542,
+          0.9496429755
+        ],
+        "mae": [
+          4.6161003245,
+          2.6049644462,
+          2.5666361232,
+          2.5906995653,
+          2.5805267801
+        ],
+        "mse": [
+          37.4537808164,
+          10.698523153,
+          10.4004150078,
+          10.5400717602,
+          10.5496779945
+        ],
+        "rmse": [
+          6.1199494129,
+          3.2708596963,
+          3.2249674429,
+          3.2465476679,
+          3.2480267848
+        ]
+      },
+      "average": {
+        "r2": 0.9073322042,
+        "mae": 2.9917854479,
+        "mse": 15.9284937464,
+        "rmse": 3.822070201
+      }
+    },
+    "xgboost": {
+      "folds": {
+        "r2": [
+          0.7460526572,
+          0.9358605385,
+          0.9410108898,
+          0.9464431065,
+          0.9493550702
+        ],
+        "mae": [
+          4.7903787631,
+          2.6631096761,
+          2.577675078,
+          2.6200882736,
+          2.5940465421
+        ],
+        "mse": [
+          39.5902690401,
+          11.2038407403,
+          10.4764655131,
+          10.6646353281,
+          10.6099934856
+        ],
+        "rmse": [
+          6.292079866,
+          3.3472138773,
+          3.2367368619,
+          3.265675325,
+          3.257298495
+        ]
+      },
+      "average": {
+        "r2": 0.9037444525,
+        "mae": 3.0490596666,
+        "mse": 16.5090408214,
+        "rmse": 3.879800885
+      }
+    }
+  },
+  "feature_importance": {
+    "random_forest": {
+      "workers": 0.0024034781,
+      "temp": 0.1705481141,
+      "pressure": 0.0029439529,
+      "humidity": 0.0030372422,
+      "vibration": 0.0023623827,
+      "speed": 0.002863382,
+      "age": 0.0279554676,
+      "service_days": 0.2849767877,
+      "gas": 0.0030179545,
+      "sparks": 0.0007355918,
+      "hour_of_day": 0.0023214726,
+      "day_of_week": 0.0012546852,
+      "is_weekend": 0.0001710953,
+      "month": 0.0011473326,
+      "training_encoded": 0.0003675879,
+      "alarm_encoded": 0.0003756961,
+      "exp_encoded": 0.0003653378,
+      "factory_factory_b": 0.000316256,
+      "factory_factory_c": 0.000326747,
+      "factory_factory_d": 0.000317283,
+      "region_rural": 0.0003479058,
+      "region_urban": 0.0003298026,
+      "shift_night": 0.0003673226,
+      "workers_sparks_interaction": 0.0020334018,
+      "temp_pressure_interaction": 0.4868168499,
+      "vibration_speed_interaction": 0.0022968704
+    },
+    "xgboost": {
+      "workers": 0.0006698917,
+      "temp": 0.2398884892,
+      "pressure": 0.0038312832,
+      "humidity": 0.0008044633,
+      "vibration": 0.0007585378,
+      "speed": 0.000832615,
+      "age": 0.0305744372,
+      "service_days": 0.2357673645,
+      "gas": 0.0008278812,
+      "sparks": 0.0008012176,
+      "hour_of_day": 0.0007825596,
+      "day_of_week": 0.0007766632,
+      "is_weekend": 0.0,
+      "month": 0.0007789535,
+      "training_encoded": 0.0006831858,
+      "alarm_encoded": 0.0006939969,
+      "exp_encoded": 0.0008547917,
+      "factory_factory_b": 0.0007440741,
+      "factory_factory_c": 0.0007855989,
+      "factory_factory_d": 0.0007852599,
+      "region_rural": 0.0008626101,
+      "region_urban": 0.0008240335,
+      "shift_night": 0.0007210345,
+      "workers_sparks_interaction": 0.0008499578,
+      "temp_pressure_interaction": 0.4742290974,
+      "vibration_speed_interaction": 0.0008719441
+    }
+  },
+  "coefficients": {
+    "linear_regression": {
+      "workers": 0.0012138323,
+      "temp": 1.6215468091,
+      "pressure": 0.0149624899,
+      "humidity": -0.0004469913,
+      "vibration": 0.0066555406,
+      "speed": -1.9358e-06,
+      "age": 0.4667123592,
+      "service_days": 0.0778494927,
+      "gas": 0.0055489939,
+      "sparks": 0.0073342853,
+      "hour_of_day": 0.0003264767,
+      "day_of_week": -0.002050795,
+      "is_weekend": 0.0327162044,
+      "month": -0.0019741025,
+      "training_encoded": -0.0112870788,
+      "alarm_encoded": 0.0277279675,
+      "exp_encoded": -0.0087357123,
+      "factory_factory_b": 0.0751699571,
+      "factory_factory_c": 0.0086279639,
+      "factory_factory_d": 0.0677945304,
+      "region_rural": 0.0272264798,
+      "region_urban": 0.0106890552,
+      "shift_night": -0.0176203682,
+      "workers_sparks_interaction": -0.0004229388,
+      "temp_pressure_interaction": 4.18074e-05,
+      "vibration_speed_interaction": -1.2029e-06,
+      "(intercept)": -11.8545263301
+    }
+  },
+  "data_fingerprint": {
+    "train_keys_sha256": "069a36a056625052195e6eb078cb387bc505876890b4d608e819123a3a65c9dc",
+    "test_keys_sha256": "6553aba740031a7d36f264ee015eb411ff8b85c900e84e2130db1cfb15c50dee",
+    "train_matrix_sha256": "a71b27d7189ef15f439272196fdb19e9ee0a2b9878a6b510135b6971e1a8992e",
+    "test_matrix_sha256": "01c6d692b527dced9bf6dedd034c5809c6e81c1046d1478bb77305eb372ec872"
+  },
+  "libraries": {
+    "scikit-learn": "1.8.0",
+    "xgboost": "3.2.0",
+    "pandas": "3.0.5",
+    "numpy": "2.5.3"
+  }
+}

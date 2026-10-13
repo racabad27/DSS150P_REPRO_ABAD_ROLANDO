@@ -41,8 +41,9 @@ REQUIRED_SECTIONS = (
 )
 
 
-
+# ---------------------------------------------------------------------------
 # .env handling and ${VAR:-default} interpolation
+# ---------------------------------------------------------------------------
 def load_env_file(path: Path) -> dict[str, str]:
     """Read KEY=VALUE pairs from a .env file into os.environ.
 
@@ -112,7 +113,9 @@ def to_bool(value: Any) -> bool:
     raise ConfigError(f"Expected a true/false value, got {value!r}")
 
 
-
+# ---------------------------------------------------------------------------
+# Settings object
+# ---------------------------------------------------------------------------
 @dataclass(frozen=True)
 class Settings:
     """Resolved configuration with helpers for paths and nested values."""
@@ -143,7 +146,7 @@ class Settings:
             raise ConfigError(f"paths.{key} is not configured")
         return self.resolve(value)
 
-    #  frequently used locations 
+    # -- frequently used locations ---------------------------------------------
     @property
     def source_file(self) -> Path:
         return self.path("source_file")
@@ -263,8 +266,9 @@ class Settings:
         }
 
 
-
+# ---------------------------------------------------------------------------
 # Validation
+# ---------------------------------------------------------------------------
 def _validate(raw: dict) -> list[str]:
     """Return a list of problems (empty list = valid). Warnings are prefixed."""
     problems: list[str] = []
@@ -325,6 +329,13 @@ def _validate(raw: dict) -> list[str]:
         problems.append("model.cross_validation.n_splits must be an integer >= 2")
     if model.get("input_source") not in {"postgres", "parquet"}:
         problems.append("model.input_source must be 'postgres' or 'parquet'")
+    encoding = model.get("encoding") or {}
+    binary = encoding.get("binary") or {}
+    if not isinstance(binary, dict) or not all(isinstance(m, dict) and all(isinstance(k, str) for k in m)
+                                               for m in binary.values()):
+        problems.append("model.encoding.binary must map column -> {\"category\": number} with quoted categories")
+    if not isinstance(encoding.get("one_hot_drop_first"), list):
+        problems.append("model.encoding.one_hot_drop_first must be a list of columns")
 
     try:
         int(raw["database"].get("port"))

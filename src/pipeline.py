@@ -16,6 +16,7 @@ import pandas as pd
 from src.benchmark import partition_demo, run_benchmark
 from src.config import Settings
 from src.contract import load_contract
+from src.evaluate import evaluate_models, publish_outputs, reproducibility_check, write_run_summary
 from src.errors import ConfigError, DataQualityError
 from src.ingest import Checkpoint, ingest, read_raw
 from src.observability import RunRecord, StageLogger, StageResult, setup_logging, track_stage
@@ -23,6 +24,7 @@ from src.storage import (
     CURATED_TABLE, STAGING_TABLE, connect, frame_fingerprint, load_postgres, scalar, sync_audit,
     table_fingerprint,
 )
+from src.train import train_models
 from src.transform import (
     EXCLUSIONS_FILE, build_curated, build_staging, curated_path, staging_path,
 )
@@ -39,6 +41,10 @@ PIPELINE_ORDER = [
     "build_curated",
     "load_postgres",
     "validate_curated",
+    "train_model",
+    "evaluate_model",
+    "reproducibility_check",
+    "publish_outputs",
 ]
 DATABASE_STAGES = {"load_postgres"}
 
@@ -165,6 +171,39 @@ def validate_curated(settings: Settings, run_id: str, log: StageLogger, result: 
     return {"curated_rows": int(len(curated)), "database_checked": check_database, "quality": report.summary()}
 
 
+@stage("train_model")
+def train_model(settings: Settings, run_id: str, log: StageLogger, result: StageResult,
+                input_source: str | None = None, **_: Any) -> dict:
+    summary = train_models(settings, run_id, log, input_source=input_source)
+    result.counts.update({"train_rows": summary["train_rows"], "test_rows": summary["test_rows"]})
+    result.details.update(summary)
+    return summary
+
+
+@stage("evaluate_model")
+def evaluate_model(settings: Settings, run_id: str, log: StageLogger, result: StageResult, **_: Any) -> dict:
+    summary = evaluate_models(settings, run_id, log)
+    result.counts["prediction_rows"] = summary["prediction_rows"]
+    result.details.update(summary)
+    return summary
+
+
+@stage("reproducibility_check")
+def reproducibility_check_stage(settings: Settings, run_id: str, log: StageLogger, result: StageResult,
+                                **_: Any) -> dict:
+    report = reproducibility_check(settings, run_id, log)
+    result.details.update({"status": report["status"], **report["summary"], "primary": report["primary"]})
+    return report
+
+
+@stage("publish_outputs")
+def publish_outputs_stage(settings: Settings, run_id: str, log: StageLogger, result: StageResult,
+                          use_database: bool = True, **_: Any) -> dict:
+    summary = publish_outputs(settings, run_id, log, use_database=use_database)
+    result.details.update(summary)
+    return summary
+
+
 @stage("benchmark_storage")
 def benchmark_storage(settings: Settings, run_id: str, log: StageLogger, result: StageResult, **_: Any) -> dict:
     """Optional experiment (not part of run-all): CSV vs JSONL vs Parquet vs PostgreSQL."""
@@ -192,11 +231,12 @@ def run_stage(name: str, settings: Settings, run_id: str, **params: Any) -> dict
         return STAGES[name](settings, run_id, log, result, **params)
 
 
-def _finish_run(settings: Settings, run_id: str, status: str, use_database: bool) -> dict:
-    """Store the final run status and copy the run history into PostgreSQL (best effort)."""
+def finalize_run(settings: Settings, run_id: str, status: str, use_database: bool = True) -> dict:
+    """Close the run: final status, outputs/run_summary.json and the audit sync (best effort)."""
     record = RunRecord(settings, run_id).set_status(status)
+    write_run_summary(settings, run_id)
     if use_database:
-        log = setup_logging(settings, run_id, "finish_run")
+        log = setup_logging(settings, run_id, "finalize_run")
         try:
             with connect(settings, log, attempts=1) as conn:
                 sync_audit(conn, settings)
@@ -213,13 +253,21 @@ def run_all(settings: Settings, run_id: str, mode: str = "incremental", max_batc
                   fail_after_batches=fail_after_batches)
         raw_check = run_stage("validate_raw", settings, run_id)
         if not raw_check["complete"]:
-            return _finish_run(settings, run_id, "partial", not skip_db)
+            return finalize_run(settings, run_id, "partial", not skip_db)
         for name in PIPELINE_ORDER[2:]:
             if skip_db and name in DATABASE_STAGES:
                 continue
-            params = {"check_database": False} if skip_db and name == "validate_curated" else {}
-            run_stage(name, settings, run_id, **params)
+            run_stage(name, settings, run_id, **_offline_params(name) if skip_db else {})
     except BaseException:
-        _finish_run(settings, run_id, "failed", not skip_db)
+        finalize_run(settings, run_id, "failed", not skip_db)
         raise
-    return _finish_run(settings, run_id, "success", not skip_db)
+    return finalize_run(settings, run_id, "success", not skip_db)
+
+
+def _offline_params(stage_name: str) -> dict:
+    """Stage parameters used by `run-all --skip-db` (no PostgreSQL available)."""
+    return {
+        "validate_curated": {"check_database": False},
+        "train_model": {"input_source": "parquet"},
+        "publish_outputs": {"use_database": False},
+    }.get(stage_name, {})

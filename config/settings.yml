@@ -89,6 +89,17 @@ model:
     - vibration_speed_interaction
   # Columns that must never be used as features (target and target-derived).
   leakage_columns: [risk, accident]
+  # Encodings of the original notebook. One-hot categories come from the data
+  # contract (fixed before the split, so nothing is learned from test data);
+  # the first category in alphabetical order is dropped, like
+  # pd.get_dummies(drop_first=True). Keys are quoted on purpose: unquoted
+  # Yes/No/On/Off would be read by YAML as true/false.
+  encoding:
+    binary:
+      training: {"Yes": 1, "No": 0}
+      alarm: {"On": 1, "Off": 0}
+      exp: {"Junior": 0, "Senior": 1}
+    one_hot_drop_first: [factory, region, shift]
   split:
     method: chronological      # first 80% of readings (by time) train, last 20% test
     order_by: reading_ts
