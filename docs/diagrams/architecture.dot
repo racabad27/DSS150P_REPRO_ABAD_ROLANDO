@@ -1,0 +1,85 @@
+// Architecture / lifecycle of the reproducible pipeline (one page, top to bottom).
+// Render: python scripts/render_diagrams.py   (needs Graphviz "dot")
+digraph architecture {
+  graph [rankdir=TB, fontname="Helvetica", fontsize=20, labelloc=t, pad=0.4,
+         nodesep=0.45, ranksep=0.42, newrank=true, compound=true,
+         label="DSS150P fire-risk pipeline: components and data movement\n "];
+  node  [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11,
+         fillcolor="#f4f4f5", color="#52525b", penwidth=1.1, margin="0.16,0.08"];
+  edge  [fontname="Helvetica", fontsize=9.5, color="#52525b", arrowsize=0.75];
+
+  subgraph cluster_source {
+    label="1  Source system (immutable, read-only)"; fontsize=12; style="rounded,dashed"; color="#a1a1aa";
+    csv [label="data/source/industrial_fire_risk_data.csv\n100,000 readings · 20 columns · 15-minute cadence", shape=cylinder, fillcolor="#fee2e2", color="#b91c1c"];
+    contract [label="metadata/source_manifest.yml  (SHA-256)\nmetadata/data_contract.yml  (schema + rules)", shape=note, fillcolor="#fef9c3", color="#a16207"];
+    { rank=same; csv; contract; }
+  }
+
+  subgraph cluster_ingest {
+    label="2  Ingestion  —  src/ingest.py"; fontsize=12; style="rounded,dashed"; color="#a1a1aa";
+    ingest [label="verify checksum → cut quarterly batches on reading time\nmode: full refresh | incremental (resume from checkpoint)"];
+    checkpoint [label="state/ingestion_checkpoint.json\nwatermark + committed batches", shape=note, fillcolor="#fef9c3", color="#a16207"];
+    raw [label="data/raw/batch_id=YYYYQn/\nvalues kept as text + audit columns", shape=folder, fillcolor="#e0f2fe", color="#0369a1"];
+    { rank=same; ingest; checkpoint; }
+  }
+
+  subgraph cluster_transform {
+    label="3  Transformation + data quality  —  src/transform.py, src/validate.py"; fontsize=12; style="rounded,dashed"; color="#a1a1aa";
+    staging [label="data/staging/\ntyped · snake_case · de-duplicated\n100,000 rows", shape=folder, fillcolor="#e0f2fe", color="#0369a1"];
+    quarantine [label="data/quarantine/\nrows that break the contract", shape=folder, fillcolor="#fee2e2", color="#b91c1c"];
+    curated [label="data/curated/\ncomplete cases + derived features\n98,000 rows", shape=folder, fillcolor="#e0f2fe", color="#0369a1"];
+    partitioned [label="data/partitioned/\nreading_year= / reading_month=", shape=folder, fillcolor="#e0f2fe", color="#0369a1"];
+    { rank=same; staging; quarantine; }
+    { rank=same; curated; partitioned; }
+  }
+
+  subgraph cluster_storage {
+    label="4  Storage  —  src/storage.py, sql/"; labeljust="r"; fontsize=12; style="rounded,dashed"; color="#a1a1aa";
+    postgres [label="PostgreSQL 16\nstaging.fire_risk_readings · curated.fire_risk_features\nserving.risk_predictions · audit.* (runs, stages, quality, metrics)", shape=cylinder, fillcolor="#dbeafe", color="#1d4ed8"];
+  }
+
+  subgraph cluster_model {
+    label="5  Model  —  src/train.py, src/evaluate.py"; fontsize=12; style="rounded,dashed"; color="#a1a1aa";
+    train [label="model input: 26 features in notebook order\nchronological split 78,400 train / 19,600 test\nLinear Regression · Random Forest · XGBoost"];
+    split [label="metadata/split_manifest.json", shape=note, fillcolor="#fef9c3", color="#a16207"];
+    evaluate [label="test metrics · 5-fold TimeSeriesSplit · feature importance\nreproducibility check against the baseline"];
+    expected [label="metadata/expected_metrics.json\nbaseline from paper + notebook", shape=note, fillcolor="#fef9c3", color="#a16207"];
+    { rank=same; train; split; }
+    { rank=same; evaluate; expected; }
+  }
+
+  subgraph cluster_outputs {
+    label="6  Outputs and consumers"; fontsize=12; style="rounded,dashed"; color="#a1a1aa";
+    outputs [label="outputs/metrics.json · predictions.csv\nreproducibility_check.json · model/", shape=folder, fillcolor="#dcfce7", color="#15803d"];
+    consumers [label="maintenance & safety team (predictions)\nanalysts (SQL views) · reviewer (docs/)", fillcolor="#ede9fe", color="#6d28d9"];
+    { rank=same; outputs; consumers; }
+  }
+
+  subgraph cluster_orchestration {
+    label="Orchestration  (Docker Compose: postgres · pipeline · airflow)"; fontsize=12;
+    style="rounded,filled"; fillcolor="#fffbeb"; color="#d97706";
+    airflow [label="Airflow DAG  predictive_repro_pipeline\ningest_source → validate_raw → transform_staging →\nbuild_curated → load_postgres → validate_curated →\ntrain_model → evaluate_model → reproducibility_check →\npublish_outputs", shape=component, fillcolor="#fef3c7", color="#b45309"];
+    cli [label="CLI: python -m src.cli run-all\n(calls the same stage functions)", shape=component, fillcolor="#fef3c7", color="#b45309"];
+  }
+
+  csv -> ingest;
+  contract -> ingest [style=dashed, label=" verify"];
+  ingest -> checkpoint [style=dashed, label="advance only after\na validated write"];
+  ingest -> raw;
+  raw -> staging [label=" parse with contract rules"];
+  staging -> quarantine [style=dashed, color="#b91c1c", fontcolor="#b91c1c", label="invalid rows"];
+  staging -> curated [label=" business rules + features"];
+  curated -> partitioned;
+  curated -> postgres [label=" upsert (rerun-safe)"];
+  staging -> postgres [label=" upsert"];
+  postgres -> train [label=" ORDER BY reading_ts"];
+  train -> split [style=dashed];
+  train -> evaluate;
+  expected -> evaluate [style=dashed, label="compare"];
+  evaluate -> outputs;
+  evaluate -> postgres [style=dashed, label="predictions,\nmetrics, audit", constraint=false];
+  outputs -> consumers;
+
+  airflow -> ingest [style=dotted, color="#b45309", fontcolor="#b45309", label="runs every stage", lhead=cluster_ingest];
+  { rank=same; csv; airflow; }
+}
