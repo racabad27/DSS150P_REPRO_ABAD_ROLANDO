@@ -54,6 +54,7 @@ outputs/model/*
 outputs/runs/
 outputs/quality/
 outputs/benchmark/files/
+outputs/drills/
 
 # Airflow files created when running Airflow outside Docker
 airflow_home/

@@ -1,9 +1,9 @@
 {
-  "pipeline_run_id": "af_manual__2026-10-13T14-15-30.472887-00-00",
+  "pipeline_run_id": "run_20261013T141955Z_534dab",
   "status": "success",
-  "trigger": "airflow",
-  "started_at_utc": "2026-10-13T14:15:36.732Z",
-  "finished_at_utc": "2026-10-13T14:16:42.714Z",
+  "trigger": "docker-compose",
+  "started_at_utc": "2026-10-13T14:19:55.887Z",
+  "finished_at_utc": "2026-10-13T14:20:45.468Z",
   "counts": {
     "source_rows": 100000,
     "raw_rows": 100000,
@@ -31,52 +31,52 @@
   "stages": {
     "ingest_source": {
       "status": "success",
-      "duration_s": 0.828,
+      "duration_s": 0.663,
       "attempts": 1
     },
     "validate_raw": {
       "status": "success",
-      "duration_s": 0.219,
+      "duration_s": 0.194,
       "attempts": 1
     },
     "transform_staging": {
       "status": "success",
-      "duration_s": 1.415,
+      "duration_s": 1.255,
       "attempts": 1
     },
     "build_curated": {
       "status": "success",
-      "duration_s": 1.893,
+      "duration_s": 1.835,
       "attempts": 1
     },
     "load_postgres": {
       "status": "success",
-      "duration_s": 7.902,
+      "duration_s": 6.737,
       "attempts": 1
     },
     "validate_curated": {
       "status": "success",
-      "duration_s": 0.565,
+      "duration_s": 0.465,
       "attempts": 1
     },
     "train_model": {
       "status": "success",
-      "duration_s": 13.457,
+      "duration_s": 13.387,
       "attempts": 1
     },
     "evaluate_model": {
       "status": "success",
-      "duration_s": 23.745,
+      "duration_s": 23.287,
       "attempts": 1
     },
     "reproducibility_check": {
       "status": "success",
-      "duration_s": 0.039,
+      "duration_s": 0.022,
       "attempts": 1
     },
     "publish_outputs": {
       "status": "success",
-      "duration_s": 1.399,
+      "duration_s": 1.534,
       "attempts": 1
     }
   }

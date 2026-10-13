@@ -252,7 +252,12 @@ def reproducibility_check(settings: Settings, run_id: str, log: StageLogger) -> 
 
 def render_summary(report: dict, metrics: dict, expected: dict) -> str:
     """Side-by-side Markdown table of the baseline and the reproduced metrics."""
-    table2 = expected["reported"]["paper_table2_test"]
+    reported = expected.get("reported", {})
+    table2 = reported.get("paper_table2_test") or {}
+    if not table2:  # a generic baseline file (used by the tests): take its test-set checks
+        for c in report["checks"]:
+            if c["kind"] == "test_metric":
+                table2.setdefault(c["model"], {})[c["key"]] = c["baseline"]
     lines = [
         f"# Reproducibility summary — {report['status']}",
         "",
@@ -273,9 +278,11 @@ def render_summary(report: dict, metrics: dict, expected: dict) -> str:
             diff = abs(got - base)
             lines.append(f"| {model} | {metric.upper()} | {base:.2f} | {got:.6f} | {diff:.6f} | 0.005 | "
                          f"{'pass' if diff <= 0.005 + 1e-12 else 'FAIL'} |")
-    lines += ["", "## Cross-validation (paper Table 3 vs this pipeline)", "",
-              "| Model | Avg R² | Avg MSE | Avg RMSE | Avg MAE | Fold R² (reproduced) |", "|---|---|---|---|---|---|"]
-    for model, base in expected["reported"]["paper_table3_cv"].items():
+    table3 = reported.get("paper_table3_cv") or {}
+    if table3:
+        lines += ["", "## Cross-validation (paper Table 3 vs this pipeline)", "",
+                  "| Model | Avg R² | Avg MSE | Avg RMSE | Avg MAE | Fold R² (reproduced) |", "|---|---|---|---|---|---|"]
+    for model, base in table3.items():
         avg = metrics["cv"][model]["average"]
         folds = ", ".join(f"{v:.4f}" for v in metrics["cv"][model]["folds"]["r2"])
         lines.append(f"| {model} | {base['avg_r2']:.2f} → {avg['r2']:.4f} | {base['avg_mse']:.2f} → {avg['mse']:.4f} | "

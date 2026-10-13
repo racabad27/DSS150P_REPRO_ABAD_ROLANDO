@@ -73,6 +73,14 @@ python -m src.cli run-all       # needs PostgreSQL on POSTGRES_HOST/PORT from .e
 python -m src.cli run-all --skip-db   # same pipeline without the database steps
 ```
 
+## Tests and failure drills
+
+```bash
+docker compose run --rm pipeline pytest                     # unit + integration + data-quality tests
+docker compose exec -w /opt/project airflow python -m pytest tests/test_dag.py   # DAG structure
+docker compose run --rm pipeline python scripts/failure_drill.py                 # failure injection evidence
+```
+
 ## Repository layout (target)
 
 | Folder | Purpose |
