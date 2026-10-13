@@ -6,8 +6,8 @@ Reproduction of a Predictive Analytics Project**
 | Field | Student entry |
 |---|---|
 | Name | Abad, Rolando Alfonso |
-| Student number | *(fill in)* |
-| Section | *(fill in)* |
+| Student number | *(2022136475)* |
+| Section | *(CM17)* |
 | Previous Predictive Analytics group / project title | Risma, V. L. S.; Abad, R. A.; Toliba, M. G. — *Integrating IIoT Telemetry and Machine Health Indicators for Dynamic Fire Hazard Assessment* |
 | Dataset name / source | *Industrial Fire and Accident Risk Predictor* (Kaggle, publisher "joganimitesh"), file `industrial_fire_risk_data.csv`, SHA-256 `5db607c5…14f309ba` |
 | Predictive task | **Regression**: predict the continuous fire-risk score `Risk` (0–100), evaluated on a chronological (time-ordered) holdout |

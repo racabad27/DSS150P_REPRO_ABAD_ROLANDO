@@ -1,7 +1,7 @@
 {
   "status": "PASS",
-  "pipeline_run_id": "run_20261013T143940Z_ac5fd4",
-  "checked_at_utc": "2026-10-13T14:40:27.429Z",
+  "pipeline_run_id": "af_manual__2026-10-13T15-18-22.019009-00-00",
+  "checked_at_utc": "2026-10-13T15:19:25.492Z",
   "baseline": "pa-fire-risk-group-project",
   "tolerance_policy": {
     "reported_2_decimals": 0.005,

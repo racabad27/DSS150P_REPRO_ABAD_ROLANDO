@@ -1,6 +1,6 @@
 # Reproducibility summary — PASS
 
-Run `run_20261013T143940Z_ac5fd4`, checked 2026-10-13T14:40:27.429Z. 130 of 156 checks passed, 0 failed, 26 accepted deviations (documented XGBoost version effects). Train/test rows identical to the baseline: yes.
+Run `af_manual__2026-10-13T15-18-22.019009-00-00`, checked 2026-10-13T15:19:25.492Z. 130 of 156 checks passed, 0 failed, 26 accepted deviations (documented XGBoost version effects). Train/test rows identical to the baseline: yes.
 
 ## Test set (paper Table 2 vs this pipeline)
 

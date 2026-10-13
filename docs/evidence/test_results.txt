@@ -1,8 +1,6 @@
-Test run inside the Docker images, 2026-10-12 19:05 UTC
-
-$ docker compose run --rm pipeline pytest -v
-============================= test session starts ==============================
-platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0 -- /usr/bin/python3
+﻿============================= test session starts ==============================
+platform linux -- Python 3.12.15, pytest-9.1.1, pluggy-1.6.0 -- /usr/local/bin/python3.12
+cachedir: .pytest_cache
 rootdir: /app
 configfile: pytest.ini
 testpaths: tests
@@ -62,12 +60,11 @@ tests/test_transform_unit.py::test_risk_exactly_75_accepts_both_accident_values 
 tests/test_transform_unit.py::test_derived_features_match_the_notebook_definitions PASSED [100%]
 
 =========================== short test summary info ============================
-SKIPPED [1] tests/test_dag.py:14: Airflow is only installed in the Airflow image
-======================== 52 passed, 1 skipped in 20.75s ========================
-
-$ docker compose exec airflow python -m pytest tests/test_dag.py -v
+SKIPPED [1] ../opt/project/tests/test_dag.py:14: Airflow is only installed in the Airflow image
+======================== 52 passed, 1 skipped in 14.38s ========================
 ============================= test session starts ==============================
-platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0 -- /usr/local/bin/python
+platform linux -- Python 3.12.14, pytest-9.1.1, pluggy-1.6.0 -- /home/airflow/.local/bin/python
+cachedir: .pytest_cache
 rootdir: /opt/project
 configfile: pytest.ini
 plugins: anyio-4.15.1
@@ -76,4 +73,4 @@ collecting ... collected 2 items
 tests/test_dag.py::test_dag_is_a_simple_chain_in_the_lab_order PASSED    [ 50%]
 tests/test_dag.py::test_dag_scheduling_and_failure_settings PASSED       [100%]
 
-============================== 2 passed in 1.24s ===============================
+============================== 2 passed in 1.74s ===============================
