@@ -1,14 +1,15 @@
 # -----------------------------------------------------------------------------
 # Services
-#   postgres  - PostgreSQL 16 for the staging/curated/serving/audit tables
-#   pipeline  - the Python pipeline (one-off container, profile "cli")
+#   postgres         PostgreSQL 16: pipeline tables + Airflow's own metadata DB
+#   airflow-db-init  one-off: creates the Airflow role/database if missing
+#   airflow          Apache Airflow 3.3.2 (standalone: scheduler + API/UI + DAG processor)
+#   pipeline         the Python pipeline as a one-off container (profile "cli")
 #
 # Usage (from the repository root, after `cp .env.example .env`):
-#   docker compose up -d postgres            # start the database (waits for healthy)
-#   docker compose build pipeline            # build the pipeline image
-#   docker compose run --rm pipeline         # run the whole pipeline (run-all)
+#   docker compose up -d --build             # postgres + airflow (UI: http://localhost:8080)
+#   docker compose run --rm pipeline         # or run the whole pipeline without Airflow
 #   docker compose run --rm pipeline python -m src.cli status
-#   docker compose down                      # stop (add -v to also delete the DB volume)
+#   docker compose down                      # stop (add -v to also delete the database volume)
 # -----------------------------------------------------------------------------
 name: dss150p-fire-risk
 
@@ -32,12 +33,69 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      # the pipeline only starts once the server accepts connections
+      # nothing that needs the database starts before it accepts connections
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 20
       start_period: 10s
+    restart: unless-stopped
+
+  airflow-db-init:
+    image: postgres:16-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-firerisk}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      PGDATABASE: ${POSTGRES_DB:-firerisk}
+      AIRFLOW_DB_NAME: ${AIRFLOW_DB_NAME:-airflow}
+      AIRFLOW_DB_USER: ${AIRFLOW_DB_USER:-airflow}
+      AIRFLOW_DB_PASSWORD: ${AIRFLOW_DB_PASSWORD:?Set AIRFLOW_DB_PASSWORD in .env}
+    volumes:
+      - ./docker/postgres/create-airflow-db.sh:/create-airflow-db.sh:ro
+    entrypoint: ["sh", "/create-airflow-db.sh"]
+    restart: "no"
+
+  airflow:
+    build:
+      context: .
+      dockerfile: Dockerfile.airflow
+    image: dss150p-fire-risk-airflow:1.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-db-init:
+        condition: service_completed_successfully
+    environment:
+      <<: *pipeline-environment
+      PIPELINE_TRIGGER: airflow
+      PIPELINE_PROJECT_ROOT: /opt/project
+      PYTHONPATH: /opt/project
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER:-airflow}:${AIRFLOW_DB_PASSWORD:?Set AIRFLOW_DB_PASSWORD in .env}@postgres:5432/${AIRFLOW_DB_NAME:-airflow}
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/project/dags
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"   # schedule=None, so it only runs when triggered
+      # Local lab only: every visitor of the UI is an admin, no login screen.
+      # Remove this (and set real users) before exposing Airflow anywhere else.
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "true"
+    # Same user id as the pipeline container so both can rewrite the files.
+    user: "${AIRFLOW_UID:-50000}:0"
+    ports:
+      - "${AIRFLOW_HOST_PORT:-8080}:8080"
+    volumes:
+      - ./:/opt/project
+      - ./logs/airflow:/opt/airflow/logs     # task logs end up in logs/airflow/ (git-ignored)
+    command: ["standalone"]
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/api/v2/monitor/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
     restart: unless-stopped
 
   pipeline:
@@ -52,7 +110,6 @@ services:
     environment:
       <<: *pipeline-environment
       PIPELINE_TRIGGER: docker-compose
-    # Same user id as the Airflow container so both can rewrite the files.
     user: "${AIRFLOW_UID:-50000}:0"
     volumes:
       - ./:/app

@@ -45,6 +45,9 @@ state/*
 !state/.gitkeep
 logs/*
 !logs/.gitkeep
+!logs/airflow/
+logs/airflow/*
+!logs/airflow/.gitkeep
 outputs/model/*
 !outputs/model/.gitkeep
 !outputs/model/model_card.json

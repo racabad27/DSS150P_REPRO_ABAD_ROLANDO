@@ -47,6 +47,21 @@ docker compose run --rm pipeline python -m src.cli benchmark
 docker compose run --rm pipeline python -m src.cli partition-demo --year 2022 --month 6
 ```
 
+## Orchestrate with Apache Airflow
+
+```bash
+docker compose up -d --build        # postgres + airflow (first build takes a few minutes)
+```
+
+Open http://localhost:8080 (no login in this local setup), open the DAG
+`predictive_repro_pipeline` and press *Trigger*. Or from the terminal:
+
+```bash
+docker compose exec airflow airflow dags trigger predictive_repro_pipeline
+docker compose exec airflow airflow dags trigger predictive_repro_pipeline \
+    --conf '{"ingest_mode": "full", "fail_after_batches": 2}'      # failure drill: the retry resumes
+```
+
 ## 3. Run with a local virtual environment
 
 ```bash

@@ -1,0 +1,19 @@
+# -----------------------------------------------------------------------------
+# Airflow image = official Apache Airflow 3.3.2 (Python 3.12) + the pipeline's
+# pinned packages from requirements.txt. The DAG imports the pipeline code from
+# the project folder that docker-compose.yml mounts at /opt/project.
+# Python 3.12 + the same pins as the pipeline image => identical model results.
+# -----------------------------------------------------------------------------
+FROM apache/airflow:3.3.2-python3.12
+
+# XGBoost needs the OpenMP runtime.
+USER root
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends libgomp1 \
+ && rm -rf /var/lib/apt/lists/*
+USER airflow
+
+# Installing "apache-airflow==<same version>" together with the requirements
+# stops pip from upgrading or downgrading Airflow itself by accident.
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir "apache-airflow==${AIRFLOW_VERSION}" -r /tmp/requirements.txt
