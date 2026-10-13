@@ -1,0 +1,262 @@
+# =============================================================================
+# Data contract for industrial_fire_risk_data.csv
+#
+# This file is read by the pipeline (src/validate.py, src/transform.py): the
+# column types, allowed values, ranges and the behaviour on violation below
+# are enforced in code, not just documented.
+#
+# on_violation values
+#   fail        stop the run with a non-zero exit code; nothing downstream runs
+#   quarantine  move the row to data/quarantine/ with a reason code; the run
+#               continues only while the quarantined share stays below
+#               staging.max_quarantine_rate (settings.yml, 1%)
+#   drop        remove exact duplicate rows (keep the first) and log the count
+#   warn        log it and record it in the quality report, the run continues
+# =============================================================================
+contract_version: "1.0.0"
+dataset_id: industrial_fire_risk
+owner: Rolando Alfonso Abad (DSS150P)
+description: >-
+  IIoT telemetry for four factories, one reading every 15 minutes. Target of
+  the predictive task is the continuous Risk score (0-100).
+
+source:
+  file_name: industrial_fire_risk_data.csv
+  sha256: 5db607c512fad903bcfb6e242e2dcfc6ba8f9de091becf6169e6ae5414f309ba   # same as source_manifest.yml
+  format: csv
+  delimiter: ","
+  encoding: utf-8
+  header: true
+  expected_rows: 100000
+
+grain: one row = one sensor reading for one 15-minute time slot (each slot is tagged with one factory)
+
+timestamp:
+  source_columns: [Date, Time]
+  staging_column: reading_ts
+  format: "%Y-%m-%d %H:%M:%S"
+  timezone: none in the source (plant local time, stored as TIMESTAMP WITHOUT TIME ZONE)
+  cadence_minutes: 15
+  expected_first: "2021-01-01 00:00:00"
+  expected_last: "2023-11-08 15:45:00"
+
+business_key: [reading_ts]   # Date + Time; verified unique in the source profile
+
+# Ranges are plausibility limits (wider than what was observed, see
+# source_profile.md) so that real data passes and broken values are caught.
+columns:
+  - name: Date
+    type: date
+    format: "%Y-%m-%d"
+    nullable: false
+    role: key
+    staging_name: reading_ts
+    description: Calendar date of the reading (combined with Time).
+  - name: Time
+    type: time
+    format: "%H:%M:%S"
+    nullable: false
+    role: key
+    staging_name: reading_ts
+    description: Start of the 15-minute slot (combined with Date).
+  - name: Factory
+    type: category
+    allowed_values: [Factory_A, Factory_B, Factory_C, Factory_D]
+    nullable: false
+    role: attribute
+    staging_name: factory
+    description: Factory that produced the reading.
+  - name: Region
+    type: category
+    allowed_values: [Industrial_Zone, Rural, Urban]
+    nullable: false
+    role: attribute
+    staging_name: region
+    description: Area type where the factory is located.
+  - name: Shift
+    type: category
+    allowed_values: [Day, Night]
+    nullable: false
+    role: attribute
+    staging_name: shift
+    description: Work shift label recorded with the reading.
+  - name: Workers
+    type: integer
+    min: 1
+    max: 100
+    nullable: true
+    max_null_rate: 0.05
+    role: attribute
+    staging_name: workers
+    description: Workers on site; about 2% of rows are blank in the source.
+  - name: Exp
+    type: category
+    allowed_values: [Junior, Senior]
+    nullable: false
+    role: attribute
+    staging_name: exp
+    description: Experience level of the crew on duty.
+  - name: Training
+    type: category
+    allowed_values: ["No", "Yes"]
+    nullable: false
+    role: attribute
+    staging_name: training
+    description: Whether the crew completed safety training.
+  - name: Temp
+    type: float
+    min: -20
+    max: 80
+    nullable: false
+    role: sensor
+    staging_name: temp
+    description: Ambient temperature (degrees Celsius assumed; observed 10.00-45.82).
+  - name: Pressure
+    type: float
+    min: 0
+    max: 300
+    nullable: false
+    role: sensor
+    staging_name: pressure
+    description: Pressure reading (observed 8.31-233.87; high spikes are real and kept).
+  - name: Humidity
+    type: float
+    min: 0
+    max: 100
+    nullable: false
+    role: sensor
+    staging_name: humidity
+    description: Relative humidity in percent.
+  - name: Vibration
+    type: float
+    min: 0
+    max: 20
+    nullable: false
+    role: sensor
+    staging_name: vibration
+    description: Machine vibration level (observed 0-5).
+  - name: Speed
+    type: float
+    min: 0
+    max: 10000
+    nullable: false
+    role: sensor
+    staging_name: speed
+    description: Machine speed (rpm assumed; observed 1,000-4,000).
+  - name: Age
+    type: integer
+    min: 0
+    max: 60
+    nullable: false
+    role: machine_health
+    staging_name: age
+    description: Equipment age (years assumed; observed 1-19).
+  - name: Service_Days
+    type: integer
+    min: 0
+    max: 3650
+    nullable: false
+    role: machine_health
+    staging_name: service_days
+    description: Days the machine has been in service (observed 1-364).
+  - name: Gas
+    type: float
+    min: 0
+    max: 100
+    nullable: false
+    role: sensor
+    staging_name: gas
+    description: Gas concentration reading (observed 0-10).
+  - name: Sparks
+    type: integer
+    min: 0
+    max: 50
+    nullable: false
+    role: sensor
+    staging_name: sparks
+    description: Spark events counted in the slot (observed 0-4).
+  - name: Alarm
+    type: category
+    allowed_values: ["Off", "On"]
+    nullable: false
+    role: attribute
+    staging_name: alarm
+    description: Alarm state during the slot.
+  - name: Risk
+    type: float
+    min: 0
+    max: 100
+    nullable: false
+    role: target
+    staging_name: risk
+    description: Composite fire-risk score, the regression target.
+  - name: Accident
+    type: integer
+    allowed_values: [0, 1]
+    nullable: false
+    role: outcome
+    staging_name: accident
+    description: >-
+      1 if an accident was recorded in the slot. Derived from Risk (always 1
+      above 75), so it is never used as a model feature.
+
+rules:
+  - id: source_identity
+    category: freshness_applicability
+    description: The file's SHA-256 equals source.sha256 (static dataset, so identity replaces freshness).
+    on_violation: fail
+  - id: schema_columns
+    category: schema
+    description: The header has exactly the 20 contract columns in the contract order.
+    on_violation: fail
+  - id: required_values
+    category: completeness
+    description: Every non-nullable column is filled in every row (Risk can never be blank).
+    on_violation: quarantine
+  - id: workers_null_rate
+    category: completeness
+    description: Workers is blank in at most max_null_rate (5%) of rows.
+    on_violation: fail
+  - id: types_and_formats
+    category: validity
+    description: Numbers parse as numbers (integers without fractions) and Date/Time match the formats.
+    on_violation: quarantine
+  - id: allowed_categories
+    category: validity
+    description: Category columns only use the allowed values (exact spelling after trimming spaces).
+    on_violation: quarantine
+  - id: value_ranges
+    category: validity
+    description: Numeric values fall inside the min/max plausibility limits.
+    on_violation: quarantine
+  - id: cadence
+    category: consistency
+    description: Reading times sit on the 15-minute grid (minutes 00/15/30/45, seconds 00).
+    on_violation: quarantine
+  - id: accident_matches_risk
+    category: consistency
+    description: >-
+      Project-specific business rule: Accident = 1 whenever Risk > 75 and
+      Accident = 0 whenever Risk < 75. Risk exactly 75.00 may be either because
+      Risk is rounded to 2 decimals.
+    risk_threshold: 75
+    on_violation: quarantine
+  - id: unique_business_key
+    category: uniqueness
+    description: >-
+      reading_ts identifies one reading. Exact duplicate rows are dropped (keep
+      the first); rows sharing a timestamp with different values are all
+      quarantined because we cannot tell which one is right.
+    on_violation: drop_exact_duplicates_quarantine_conflicts
+  - id: row_count
+    category: completeness
+    description: The file contains source.expected_rows rows.
+    on_violation: warn
+  - id: time_coverage
+    category: freshness_applicability
+    description: Readings cover timestamp.expected_first to timestamp.expected_last.
+    on_violation: warn
+  - id: quarantine_threshold
+    category: completeness
+    description: The share of quarantined rows stays below staging.max_quarantine_rate.
+    on_violation: fail

@@ -1,0 +1,68 @@
+# =============================================================================
+# Source manifest — identity card of the ONE authoritative source dataset.
+# The pipeline refuses to run if the file in data/source/ does not match the
+# size and SHA-256 recorded here (python -m src.cli verify-source).
+# =============================================================================
+dataset_id: industrial_fire_risk
+title: Industrial Fire and Accident Risk Predictor — IIoT sensor readings
+manifest_version: 1
+
+file:
+  name: industrial_fire_risk_data.csv
+  expected_location: data/source/industrial_fire_risk_data.csv
+  format: csv
+  delimiter: ","
+  header_row: true
+  quoting: none (no quote characters in the file)
+  encoding: utf-8 (pure ASCII, no byte-order mark)
+  line_endings: CRLF
+  size_bytes: 11564951
+  sha256: 5db607c512fad903bcfb6e242e2dcfc6ba8f9de091becf6169e6ae5414f309ba
+  rows: 100000          # data rows, header excluded
+  columns: 20
+
+origin:
+  publisher: Kaggle user "joganimitesh"
+  url: https://www.kaggle.com/datasets/joganimitesh/industrial-fire-and-accident-risk-predictor
+  obtained_from: >-
+    Standalone CSV kept with the Predictive Analytics group project files
+    (same file the group downloaded from Kaggle).
+  acquisition: see data/source/README.md (manual download, then checksum check)
+  generation: >-
+    Synthetic IIoT telemetry: one reading every 15 minutes from 2021-01-01 00:00
+    to 2023-11-08 15:45, each reading tagged with one of four factories.
+
+ownership:
+  data_owner: dataset publisher on Kaggle
+  project_steward: Rolando Alfonso Abad (DSS150P individual reproduction)
+  original_project: Risma, V. L. S.; Abad, R. A.; Toliba, M. G. (Predictive Analytics group)
+
+update_frequency: static snapshot — no updates expected; treated as a frozen release
+expected_availability: public on Kaggle; a verified local copy is required in data/source/
+
+license:
+  status: not confirmed
+  note: >-
+    The licence on the Kaggle page was not verified while this repository was
+    built, so the CSV is NOT committed to GitHub (lab section 4.4). Anyone can
+    still reproduce the work by downloading the file and checking the SHA-256.
+
+privacy:
+  personal_data: none
+  note: >-
+    Machine telemetry plus aggregate staffing fields (worker count, experience
+    level, training flag). No names, IDs or contact details.
+
+known_alternate_copies:
+  - description: copy inside PredictiveProject_FINAL.zip (used by the old notebook)
+    sha256: 6457d041b0215399f867ee0855aa136f859ff541714ebb8fed56cb4a43b44536
+    size_bytes: 11311983
+    authoritative: false
+    reason: >-
+      Re-saved by a spreadsheet program: dates DD/MM/YYYY, times H:MM:SS,
+      whole numbers without ".0". Same 100,000 records value by value.
+    evidence: docs/evidence/source_copies_comparison.md
+
+verification:
+  command: python -m src.cli verify-source
+  on_mismatch: stop the run (exit code 3) before anything is written

@@ -1,0 +1,446 @@
+{
+  "file": {
+    "file_name": "industrial_fire_risk_data.csv",
+    "location": "data/source/industrial_fire_risk_data.csv",
+    "format": "CSV",
+    "size_bytes": 11564951,
+    "sha256": "5db607c512fad903bcfb6e242e2dcfc6ba8f9de091becf6169e6ae5414f309ba",
+    "encoding": "UTF-8",
+    "ascii_only": true,
+    "byte_order_mark": false,
+    "line_endings": "CRLF",
+    "delimiter": ",",
+    "quote_characters_found": 0,
+    "header": [
+      "Date",
+      "Time",
+      "Factory",
+      "Region",
+      "Shift",
+      "Workers",
+      "Exp",
+      "Training",
+      "Temp",
+      "Pressure",
+      "Humidity",
+      "Vibration",
+      "Speed",
+      "Age",
+      "Service_Days",
+      "Gas",
+      "Sparks",
+      "Alarm",
+      "Risk",
+      "Accident"
+    ]
+  },
+  "shape": {
+    "rows": 100000,
+    "columns": 20
+  },
+  "duplicates": {
+    "full_row_duplicates": 0,
+    "business_key": [
+      "Date",
+      "Time"
+    ],
+    "business_key_duplicates": 0
+  },
+  "candidate_keys": {
+    "Date+Time": true,
+    "any_single_column": []
+  },
+  "timestamps": {
+    "format": "%Y-%m-%d %H:%M:%S",
+    "unparseable": 0,
+    "first": "2021-01-01 00:00:00",
+    "last": "2023-11-08 15:45:00",
+    "strictly_increasing": true,
+    "cadence_minutes": 15.0,
+    "gaps_not_15_min": 0,
+    "days_covered": 1042,
+    "readings_per_full_day": 96,
+    "days_with_fewer_readings": {
+      "2023-11-08": 64
+    },
+    "rows_per_year": {
+      "2021": 35040,
+      "2022": 35040,
+      "2023": 29920
+    }
+  },
+  "columns": [
+    {
+      "column": "Date",
+      "inferred_type": "str",
+      "null_count": 0,
+      "null_rate": 0.0,
+      "distinct_count": 1042,
+      "leading_or_trailing_spaces": 0,
+      "logical_type": "string",
+      "min": "2021-01-01",
+      "max": "2023-11-08"
+    },
+    {
+      "column": "Time",
+      "inferred_type": "str",
+      "null_count": 0,
+      "null_rate": 0.0,
+      "distinct_count": 96,
+      "leading_or_trailing_spaces": 0,
+      "logical_type": "string",
+      "min": "00:00:00",
+      "max": "23:45:00"
+    },
+    {
+      "column": "Factory",
+      "inferred_type": "str",
+      "null_count": 0,
+      "null_rate": 0.0,
+      "distinct_count": 4,
+      "leading_or_trailing_spaces": 0,
+      "logical_type": "category",
+      "values": {
+        "Factory_A": 25097,
+        "Factory_B": 24965,
+        "Factory_C": 24697,
+        "Factory_D": 25241
+      }
+    },
+    {
+      "column": "Region",
+      "inferred_type": "str",
+      "null_count": 0,
+      "null_rate": 0.0,
+      "distinct_count": 3,
+      "leading_or_trailing_spaces": 0,
+      "logical_type": "category",
+      "values": {
+        "Industrial_Zone": 33095,
+        "Rural": 33328,
+        "Urban": 33577
+      }
+    },
+    {
+      "column": "Shift",
+      "inferred_type": "str",
+      "null_count": 0,
+      "null_rate": 0.0,
+      "distinct_count": 2,
+      "leading_or_trailing_spaces": 0,
+      "logical_type": "category",
+      "values": {
+        "Day": 49862,
+        "Night": 50138
+      }
+    },
+    {
+      "column": "Workers",
+      "inferred_type": "float64",
+      "null_count": 2000,
+      "null_rate": 0.02,
+      "distinct_count": 45,
+      "leading_or_trailing_spaces": 0,
+      "logical_type": "integer",
+      "min": 5.0,
+      "max": 49.0,
+      "mean": 27.041214,
+      "std": 12.970023,
+      "p25": 16.0,
+      "median": 27.0,
+      "p75": 38.0,
+      "iqr_outliers": 0,
+      "zscore_outliers": 0
+    },
+    {
+      "column": "Exp",
+      "inferred_type": "str",
+      "null_count": 0,
+      "null_rate": 0.0,
+      "distinct_count": 2,
+      "leading_or_trailing_spaces": 0,
+      "logical_type": "category",
+      "values": {
+        "Junior": 49981,
+        "Senior": 50019
+      }
+    },
+    {
+      "column": "Training",
+      "inferred_type": "str",
+      "null_count": 0,
+      "null_rate": 0.0,
+      "distinct_count": 2,
+      "leading_or_trailing_spaces": 0,
+      "logical_type": "category",
+      "values": {
+        "No": 50267,
+        "Yes": 49733
+      }
+    },
+    {
+      "column": "Temp",
+      "inferred_type": "float64",
+      "null_count": 0,
+      "null_rate": 0.0,
+      "distinct_count": 3284,
+      "leading_or_trailing_spaces": 0,
+      "logical_type": "float",
+      "min": 10.0,
+      "max": 45.82,
+      "mean": 25.308615,
+      "std": 7.682433,
+      "p25": 18.66,
+      "median": 25.58,
+      "p75": 31.85,
+      "iqr_outliers": 0,
+      "zscore_outliers": 0
+    },
+    {
+      "column": "Pressure",
+      "inferred_type": "float64",
+      "null_count": 0,
+      "null_rate": 0.0,
+      "distinct_count": 2774,
+      "leading_or_trailing_spaces": 0,
+      "logical_type": "float",
+      "min": 8.31,
+      "max": 233.87,
+      "mean": 23.656262,
+      "std": 14.764252,
+      "p25": 19.32,
+      "median": 22.78,
+      "p75": 26.05,
+      "iqr_outliers": 508,
+      "zscore_outliers": 500
+    },
+    {
+      "column": "Humidity",
+      "inferred_type": "float64",
+      "null_count": 0,
+      "null_rate": 0.0,
+      "distinct_count": 5001,
+      "leading_or_trailing_spaces": 0,
+      "logical_type": "float",
+      "min": 30.0,
+      "max": 80.0,
+      "mean": 55.000662,
+      "std": 14.412768,
+      "p25": 42.51,
+      "median": 54.99,
+      "p75": 67.48,
+      "iqr_outliers": 0,
+      "zscore_outliers": 0
+    },
+    {
+      "column": "Vibration",
+      "inferred_type": "float64",
+      "null_count": 0,
+      "null_rate": 0.0,
+      "distinct_count": 501,
+      "leading_or_trailing_spaces": 0,
+      "logical_type": "float",
+      "min": 0.0,
+      "max": 5.0,
+      "mean": 2.499016,
+      "std": 1.442916,
+      "p25": 1.25,
+      "median": 2.5,
+      "p75": 3.75,
+      "iqr_outliers": 0,
+      "zscore_outliers": 0
+    },
+    {
+      "column": "Speed",
+      "inferred_type": "float64",
+      "null_count": 0,
+      "null_rate": 0.0,
+      "distinct_count": 85084,
+      "leading_or_trailing_spaces": 0,
+      "logical_type": "float",
+      "min": 1000.0,
+      "max": 3999.99,
+      "mean": 2503.567597,
+      "std": 864.481735,
+      "p25": 1754.84,
+      "median": 2504.945,
+      "p75": 3251.3625,
+      "iqr_outliers": 0,
+      "zscore_outliers": 0
+    },
+    {
+      "column": "Age",
+      "inferred_type": "int64",
+      "null_count": 0,
+      "null_rate": 0.0,
+      "distinct_count": 19,
+      "leading_or_trailing_spaces": 0,
+      "logical_type": "integer",
+      "min": 1,
+      "max": 19,
+      "mean": 9.9882,
+      "std": 5.474267,
+      "p25": 5.0,
+      "median": 10.0,
+      "p75": 15.0,
+      "iqr_outliers": 0,
+      "zscore_outliers": 0
+    },
+    {
+      "column": "Service_Days",
+      "inferred_type": "int64",
+      "null_count": 0,
+      "null_rate": 0.0,
+      "distinct_count": 364,
+      "leading_or_trailing_spaces": 0,
+      "logical_type": "integer",
+      "min": 1,
+      "max": 364,
+      "mean": 182.74147,
+      "std": 105.012762,
+      "p25": 92.0,
+      "median": 183.0,
+      "p75": 273.25,
+      "iqr_outliers": 0,
+      "zscore_outliers": 0
+    },
+    {
+      "column": "Gas",
+      "inferred_type": "float64",
+      "null_count": 0,
+      "null_rate": 0.0,
+      "distinct_count": 1001,
+      "leading_or_trailing_spaces": 0,
+      "logical_type": "float",
+      "min": 0.0,
+      "max": 10.0,
+      "mean": 5.01685,
+      "std": 2.891816,
+      "p25": 2.5,
+      "median": 5.04,
+      "p75": 7.53,
+      "iqr_outliers": 0,
+      "zscore_outliers": 0
+    },
+    {
+      "column": "Sparks",
+      "inferred_type": "int64",
+      "null_count": 0,
+      "null_rate": 0.0,
+      "distinct_count": 5,
+      "leading_or_trailing_spaces": 0,
+      "logical_type": "integer",
+      "min": 0,
+      "max": 4,
+      "mean": 1.99378,
+      "std": 1.412282,
+      "p25": 1.0,
+      "median": 2.0,
+      "p75": 3.0,
+      "iqr_outliers": 0,
+      "zscore_outliers": 0
+    },
+    {
+      "column": "Alarm",
+      "inferred_type": "str",
+      "null_count": 0,
+      "null_rate": 0.0,
+      "distinct_count": 2,
+      "leading_or_trailing_spaces": 0,
+      "logical_type": "category",
+      "values": {
+        "Off": 49875,
+        "On": 50125
+      }
+    },
+    {
+      "column": "Risk",
+      "inferred_type": "float64",
+      "null_count": 0,
+      "null_rate": 0.0,
+      "distinct_count": 7750,
+      "leading_or_trailing_spaces": 0,
+      "logical_type": "float",
+      "min": 0.0,
+      "max": 100.0,
+      "mean": 48.524194,
+      "std": 15.525594,
+      "p25": 37.3,
+      "median": 48.59,
+      "p75": 59.89,
+      "iqr_outliers": 24,
+      "zscore_outliers": 9
+    },
+    {
+      "column": "Accident",
+      "inferred_type": "int64",
+      "null_count": 0,
+      "null_rate": 0.0,
+      "distinct_count": 2,
+      "leading_or_trailing_spaces": 0,
+      "logical_type": "integer",
+      "min": 0,
+      "max": 1,
+      "mean": 0.04093,
+      "std": 0.198129,
+      "p25": 0.0,
+      "median": 0.0,
+      "p75": 0.0,
+      "iqr_outliers": null,
+      "zscore_outliers": null
+    }
+  ],
+  "target": {
+    "column": "Risk",
+    "range_observed": [
+      0.0,
+      100.0
+    ],
+    "mean": 48.524194,
+    "std": 15.525594,
+    "histogram_0_100_step_10": {
+      "0-10": 232,
+      "10-20": 2797,
+      "20-30": 9823,
+      "30-40": 17663,
+      "40-50": 22858,
+      "50-60": 21840,
+      "60-70": 15952,
+      "70-80": 7401,
+      "80-90": 1386,
+      "90-100": 48
+    },
+    "values_at_bounds": {
+      "0": 1,
+      "100": 1
+    }
+  },
+  "accident": {
+    "positive_rate": 0.04093,
+    "positives": 4093,
+    "vs_risk_threshold_75": {
+      "risk_above_75": {
+        "accident_0": 0,
+        "accident_1": 4091
+      },
+      "risk_equal_75": {
+        "accident_0": 5,
+        "accident_1": 2
+      },
+      "risk_below_75": {
+        "accident_0": 95902,
+        "accident_1": 0
+      }
+    }
+  },
+  "workers_missing": {
+    "rows": 2000,
+    "rate": 0.02,
+    "by_year": {
+      "2021": 741,
+      "2022": 655,
+      "2023": 604
+    },
+    "accidents_among_missing": 81
+  }
+}

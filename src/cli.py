@@ -4,6 +4,8 @@ Usage examples (run from the repository root):
 
     python -m src.cli --help
     python -m src.cli env-check
+    python -m src.cli verify-source
+    python -m src.cli profile
 """
 
 from __future__ import annotations
@@ -16,7 +18,10 @@ from importlib import metadata
 from pathlib import Path
 
 from src.config import Settings, load_settings
+from src.contract import verify_source
 from src.errors import PipelineError
+from src.observability import resolve_run_id, setup_logging
+from src.profiling import profile_source, write_profile
 
 
 # ---------------------------------------------------------------------------
@@ -63,6 +68,36 @@ def cmd_env_check(args: argparse.Namespace, settings: Settings) -> int:
 
 
 # ---------------------------------------------------------------------------
+# source identity and profile
+# ---------------------------------------------------------------------------
+def cmd_verify_source(args: argparse.Namespace, settings: Settings) -> int:
+    log = setup_logging(settings, resolve_run_id(args.run_id), "verify_source")
+    result = verify_source(settings, log)
+    print(f"File     : {settings.source_file}")
+    print(f"Size     : {result['size_bytes']:,} bytes (expected {result['expected_size_bytes']:,})")
+    print(f"SHA-256  : {result['sha256']}")
+    print(f"Expected : {result['expected_sha256']}")
+    print("Result   : " + ("MATCHES the source manifest" if result["matches_manifest"]
+                           else "DOES NOT MATCH (verification disabled for this run)"))
+    return 0
+
+
+def cmd_profile(args: argparse.Namespace, settings: Settings) -> int:
+    log = setup_logging(settings, resolve_run_id(args.run_id), "profile")
+    verify_source(settings, log)
+    profile = profile_source(settings)
+    json_path, md_path = write_profile(settings, profile)
+    log.event("profile_written", "Source profile written",
+              rows=profile["shape"]["rows"], columns=profile["shape"]["columns"])
+    print(f"Rows x columns : {profile['shape']['rows']:,} x {profile['shape']['columns']}")
+    print(f"Time range     : {profile['timestamps']['first']} -> {profile['timestamps']['last']}")
+    print(f"Duplicate keys : {profile['duplicates']['business_key_duplicates']}")
+    print(f"Workers blank  : {profile['workers_missing']['rows']:,}")
+    print(f"Wrote          : {json_path.relative_to(settings.root)}, {md_path.relative_to(settings.root)}")
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # argument parsing
 # ---------------------------------------------------------------------------
 def build_parser() -> argparse.ArgumentParser:
@@ -75,6 +110,14 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("env-check", help="check Python/package versions and the resolved config")
     p.add_argument("--strict", action="store_true", help="exit 1 if any package differs from the pins")
     p.set_defaults(func=cmd_env_check)
+
+    p = sub.add_parser("verify-source", help="check the source CSV against source_manifest.yml")
+    p.add_argument("--run-id", help="pipeline run id (default: generated)")
+    p.set_defaults(func=cmd_verify_source)
+
+    p = sub.add_parser("profile", help="profile the source and write metadata/source_profile.*")
+    p.add_argument("--run-id", help="pipeline run id (default: generated)")
+    p.set_defaults(func=cmd_profile)
     return parser
 
 
