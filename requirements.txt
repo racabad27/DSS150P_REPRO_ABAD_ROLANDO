@@ -1,0 +1,29 @@
+# Python 3.12 is the target interpreter (same minor version as the Docker images).
+#
+# Every package is pinned to an exact version. The modelling libraries are pinned
+# on purpose to the versions that reproduce the original Predictive Analytics
+# results (see docs/reproducibility_report.md, section "Dependency forensics"):
+#   - scikit-learn 1.9.x changes RandomForestRegressor results; 1.8.0 matches the
+#     original notebook to 8 decimal places.
+#   - xgboost >= 3.3.0 changes XGBRegressor results; 3.2.0 matches the numbers
+#     reported in the paper (Table 2).
+# The remaining versions match the Apache Airflow 3.3.2 constraint file for
+# Python 3.12, so the same requirements install cleanly inside the Airflow image.
+
+# --- data handling ---
+numpy==2.5.3
+pandas==3.0.5
+pyarrow==25.0.1
+PyYAML==6.0.3
+
+# --- modelling ---
+scikit-learn==1.8.0
+scipy==1.18.1
+joblib==1.6.0
+xgboost==3.2.0
+
+# --- PostgreSQL client (psycopg 3, includes a prebuilt libpq) ---
+psycopg[binary]==3.3.5
+
+# --- tests ---
+pytest==9.1.1

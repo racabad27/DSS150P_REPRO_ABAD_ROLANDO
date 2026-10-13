@@ -1,0 +1,135 @@
+# Pipeline configuration
+#   Paths are RELATIVE to the repository root, so the project runs from any
+#   folder on any machine (no C:\Users\... or /Users/... paths anywhere).
+#   Values written as ${NAME:-default} come from an environment variable (or
+#   the .env file) when it is set, otherwise the default after ":-" is used.
+#   Secrets (passwords) only ever come from the environment.
+# Changing a value here changes the pipeline WITHOUT editing Python code.
+
+project:
+  name: dss150p-fire-risk-repro
+  dataset_id: industrial_fire_risk
+  description: >-
+    Reproducible data pipeline for the IIoT industrial fire-risk regression
+    project (Predictive Analytics, previous term).
+
+paths:
+  source_file: ${PIPELINE_SOURCE_FILE:-data/source/industrial_fire_risk_data.csv}
+  data_dir: ${PIPELINE_DATA_DIR:-data}
+  outputs_dir: ${PIPELINE_OUTPUTS_DIR:-outputs}
+  state_dir: ${PIPELINE_STATE_DIR:-state}
+  logs_dir: ${PIPELINE_LOGS_DIR:-logs}
+  metadata_dir: metadata
+  sql_dir: sql
+  docs_dir: docs
+
+source:
+  manifest_file: metadata/source_manifest.yml
+  contract_file: metadata/data_contract.yml
+  profile_markdown: metadata/source_profile.md
+  profile_json: metadata/source_profile.json
+  encoding: utf-8
+  delimiter: ","
+  # The source must match the SHA-256 in source_manifest.yml before anything runs.
+  # Only failure drills switch this off (via PIPELINE_VERIFY_CHECKSUM=false).
+  verify_checksum: ${PIPELINE_VERIFY_CHECKSUM:-true}
+
+ingestion:
+  # The CSV is split into deterministic arrival batches on the reading
+  # timestamp to simulate data arriving over time (quarter or month).
+  batch_frequency: ${PIPELINE_BATCH_FREQUENCY:-quarter}
+  checkpoint_file: ingestion_checkpoint.json   # lives in paths.state_dir
+
+staging:
+  # Rows that break the data contract go to data/quarantine/. If more than this
+  # share of rows is quarantined the run stops instead of training on bad data.
+  max_quarantine_rate: 0.01
+
+curated:
+  # Baseline rule from the original notebook: drop rows where Workers is missing
+  # (listwise deletion, 2,000 of 100,000 rows).
+  required_complete_columns: [workers]
+  # Hive-style partitions written to data/partitioned/ for selective reads.
+  partition_columns: [reading_year, reading_month]
+
+model:
+  target: risk
+  # Exact feature order of the original notebook (lower-cased names).
+  # Order matters: tree models break ties between equally good splits by column
+  # position, so a different order can give slightly different results.
+  features:
+    - workers
+    - temp
+    - pressure
+    - humidity
+    - vibration
+    - speed
+    - age
+    - service_days
+    - gas
+    - sparks
+    - hour_of_day
+    - day_of_week
+    - is_weekend
+    - month
+    - training_encoded
+    - alarm_encoded
+    - exp_encoded
+    - factory_factory_b
+    - factory_factory_c
+    - factory_factory_d
+    - region_rural
+    - region_urban
+    - shift_night
+    - workers_sparks_interaction
+    - temp_pressure_interaction
+    - vibration_speed_interaction
+  # Columns that must never be used as features (target and target-derived).
+  leakage_columns: [risk, accident]
+  split:
+    method: chronological      # first 80% of readings (by time) train, last 20% test
+    order_by: reading_ts
+    train_fraction: 0.8
+  random_seed: 42              # used for every model that has randomness
+  n_jobs: -1                   # CPU cores for fitting (results do not depend on it)
+  models:
+    linear_regression: {}
+    random_forest:
+      n_estimators: 100
+    xgboost:
+      n_estimators: 100
+  cross_validation:
+    method: TimeSeriesSplit
+    n_splits: 5
+  primary_model: random_forest
+  primary_metric: rmse
+  # Where training reads the curated data from: "postgres" (the loaded curated
+  # table, default) or "parquet" (data/curated/, useful when no database runs).
+  input_source: ${PIPELINE_MODEL_INPUT:-postgres}
+
+reproducibility:
+  expected_metrics_file: metadata/expected_metrics.json
+  split_manifest_file: metadata/split_manifest.json
+
+database:
+  host: ${POSTGRES_HOST:-localhost}
+  port: ${POSTGRES_PORT:-5432}
+  dbname: ${POSTGRES_DB:-firerisk}
+  user: ${POSTGRES_USER:-firerisk}
+  password: ${POSTGRES_PASSWORD:-}
+  connect_timeout_s: 10
+
+benchmark:
+  read_repeats: 5              # each read is repeated 5 times and the median reported
+  warmup_runs: 1               # an extra first (cold) read, reported separately
+  postgres_table: bench.fire_risk_curated
+  selective_filter:
+    factory: Factory_B
+    start_ts: "2023-01-01 00:00:00"
+  partition_demo:
+    reading_year: 2022
+    reading_month: 6
+
+logging:
+  level: ${PIPELINE_LOG_LEVEL:-INFO}
+  json_log_file: pipeline.jsonl   # lives in paths.logs_dir
