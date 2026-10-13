@@ -1,0 +1,79 @@
+Test run inside the Docker images, 2026-10-12 19:05 UTC
+
+$ docker compose run --rm pipeline pytest -v
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0 -- /usr/bin/python3
+rootdir: /app
+configfile: pytest.ini
+testpaths: tests
+collecting ... collected 52 items / 1 skipped
+
+tests/test_config.py::test_default_settings_load_and_resolve_relative_paths PASSED [  1%]
+tests/test_config.py::test_committed_config_has_no_machine_specific_paths PASSED [  3%]
+tests/test_config.py::test_environment_variable_overrides_default PASSED [  5%]
+tests/test_config.py::test_invalid_values_raise_config_error[overrides0-train_fraction] PASSED [  7%]
+tests/test_config.py::test_invalid_values_raise_config_error[overrides1-leakage] PASSED [  9%]
+tests/test_config.py::test_invalid_values_raise_config_error[overrides2-duplicates] PASSED [ 11%]
+tests/test_config.py::test_invalid_values_raise_config_error[overrides3-batch_frequency] PASSED [ 13%]
+tests/test_config.py::test_invalid_values_raise_config_error[overrides4-primary_model] PASSED [ 15%]
+tests/test_config.py::test_to_bool[true-True] PASSED                     [ 17%]
+tests/test_config.py::test_to_bool[0-False] PASSED                       [ 19%]
+tests/test_config.py::test_to_bool[Yes-True] PASSED                      [ 21%]
+tests/test_config.py::test_to_bool[off-False] PASSED                     [ 23%]
+tests/test_ingest_unit.py::test_row_hash_is_deterministic_and_content_sensitive PASSED [ 25%]
+tests/test_ingest_unit.py::test_row_hash_distinguishes_missing_from_empty_text PASSED [ 26%]
+tests/test_ingest_unit.py::test_content_checksum_ignores_row_order PASSED [ 28%]
+tests/test_ingest_unit.py::test_quarter_and_month_batches PASSED         [ 30%]
+tests/test_integration.py::test_interrupted_ingestion_resumes_without_duplicates PASSED [ 32%]
+tests/test_integration.py::test_full_refresh_rebuilds_the_same_raw_layer PASSED [ 34%]
+tests/test_integration.py::test_pipeline_is_deterministic_and_the_reproducibility_gate_works PASSED [ 36%]
+tests/test_integration.py::test_missing_column_is_stopped_before_staging PASSED [ 38%]
+tests/test_integration.py::test_too_many_invalid_rows_publish_nothing PASSED [ 40%]
+tests/test_integration.py::test_postgres_load_is_rerun_safe PASSED       [ 42%]
+tests/test_integration.py::test_clean_removes_generated_files_but_keeps_the_source PASSED [ 44%]
+tests/test_integration.py::test_cli_entry_point_runs PASSED              [ 46%]
+tests/test_model_unit.py::test_encoding_matches_pandas_get_dummies_drop_first PASSED [ 48%]
+tests/test_model_unit.py::test_feature_matrix_uses_the_configured_order PASSED [ 50%]
+tests/test_model_unit.py::test_unknown_category_is_rejected PASSED       [ 51%]
+tests/test_model_unit.py::test_chronological_split_is_time_ordered_and_disjoint PASSED [ 53%]
+tests/test_model_unit.py::test_key_digest_does_not_depend_on_row_order PASSED [ 55%]
+tests/test_model_unit.py::test_reproduced_value_lookup_for_every_check_kind PASSED [ 57%]
+tests/test_quality_checks.py::test_clean_staging_passes_every_check PASSED [ 59%]
+tests/test_quality_checks.py::test_schema_check_detects_missing_column PASSED [ 61%]
+tests/test_quality_checks.py::test_completeness_check_detects_missing_target PASSED [ 63%]
+tests/test_quality_checks.py::test_uniqueness_check_detects_duplicate_business_key PASSED [ 65%]
+tests/test_quality_checks.py::test_validity_checks_detect_range_and_category_errors PASSED [ 67%]
+tests/test_quality_checks.py::test_business_rule_detects_accident_risk_mismatch PASSED [ 69%]
+tests/test_quality_checks.py::test_quarantine_threshold_stops_a_run_with_too_many_bad_rows PASSED [ 71%]
+tests/test_quality_checks.py::test_curated_check_detects_a_wrong_derived_feature PASSED [ 73%]
+tests/test_quality_checks.py::test_predictive_integrity_detects_leakage_and_overlap PASSED [ 75%]
+tests/test_transform_unit.py::test_contract_violations_get_a_reason_code[changes0-INVALID_TIMESTAMP] PASSED [ 76%]
+tests/test_transform_unit.py::test_contract_violations_get_a_reason_code[changes1-OFF_CADENCE] PASSED [ 78%]
+tests/test_transform_unit.py::test_contract_violations_get_a_reason_code[changes2-MISSING_REQUIRED] PASSED [ 80%]
+tests/test_transform_unit.py::test_contract_violations_get_a_reason_code[changes3-INVALID_CATEGORY] PASSED [ 82%]
+tests/test_transform_unit.py::test_contract_violations_get_a_reason_code[changes4-INVALID_TYPE] PASSED [ 84%]
+tests/test_transform_unit.py::test_contract_violations_get_a_reason_code[changes5-INVALID_TYPE] PASSED [ 86%]
+tests/test_transform_unit.py::test_contract_violations_get_a_reason_code[changes6-OUT_OF_RANGE] PASSED [ 88%]
+tests/test_transform_unit.py::test_contract_violations_get_a_reason_code[changes7-ACCIDENT_RISK_MISMATCH] PASSED [ 90%]
+tests/test_transform_unit.py::test_contract_violations_get_a_reason_code[changes8-INVALID_CATEGORY] PASSED [ 92%]
+tests/test_transform_unit.py::test_valid_row_passes_and_is_typed PASSED  [ 94%]
+tests/test_transform_unit.py::test_blank_workers_is_allowed_in_staging PASSED [ 96%]
+tests/test_transform_unit.py::test_risk_exactly_75_accepts_both_accident_values PASSED [ 98%]
+tests/test_transform_unit.py::test_derived_features_match_the_notebook_definitions PASSED [100%]
+
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_dag.py:14: Airflow is only installed in the Airflow image
+======================== 52 passed, 1 skipped in 20.75s ========================
+
+$ docker compose exec airflow python -m pytest tests/test_dag.py -v
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0 -- /usr/local/bin/python
+rootdir: /opt/project
+configfile: pytest.ini
+plugins: anyio-4.15.1
+collecting ... collected 2 items
+
+tests/test_dag.py::test_dag_is_a_simple_chain_in_the_lab_order PASSED    [ 50%]
+tests/test_dag.py::test_dag_scheduling_and_failure_settings PASSED       [100%]
+
+============================== 2 passed in 1.24s ===============================

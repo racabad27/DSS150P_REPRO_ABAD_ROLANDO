@@ -136,6 +136,13 @@ def run_record(settings: Settings, dag_run_id: str) -> dict:
     return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
 
 
+def load_changes(record: dict) -> dict[str, tuple]:
+    """(inserted, updated, deleted) per table from the load_postgres stage of a run record."""
+    details = record.get("stages", {}).get("load_postgres", {}).get("details", {})
+    return {table: (d["inserted"], d["updated"], d["deleted"]) for table, d in details.items()
+            if isinstance(d, dict) and "inserted" in d}
+
+
 def log_lines(settings: Settings, dag_run_id: str, stage: str = "ingest_source") -> list[str]:
     """Lines of logs/pipeline.jsonl (our structured log) for one run and stage."""
     path = settings.logs_dir / "pipeline.jsonl"
@@ -258,20 +265,20 @@ def main() -> int:
     s4.tasks = api.task_instances(s4.run_id)
 
     # checks ---------------------------------------------------------------------------------
+    for scenario in (s1, s2, s3, s4):
+        changes = load_changes(run_record(settings, scenario.run_id))
+        scenario.notes.append("load_postgres result per table (inserted, updated, deleted): "
+                              + ", ".join(f"`{table}` {value}" for table, value in changes.items()))
     for scenario in (s1, s2, s3):
         scenario.checks["DAG run finished with state success"] = scenario.states[-1] == "success"
         scenario.checks["all 10 tasks succeeded"] = all(ti["state"] == "success" for ti in scenario.tasks)
 
     record2 = run_record(settings, s2.run_id)
     ingest2 = record2.get("stages", {}).get("ingest_source", {}).get("details", {})
-    load2 = record2.get("stages", {}).get("load_postgres", {}).get("details", {})
-    changed2 = {table: (d["inserted"], d["updated"], d["deleted"]) for table, d in load2.items()
-                if isinstance(d, dict) and "inserted" in d}
+    changed2 = load_changes(record2)
     s2.checks["no new batch was ingested (0 written)"] = ingest2.get("batches_written_this_run") == 0
     s2.checks["database load inserted/updated/deleted 0 rows in every table"] = (
         bool(changed2) and all(v == (0, 0, 0) for v in changed2.values()))
-    s2.notes.append("load_postgres result per table (inserted, updated, deleted): "
-                    + ", ".join(f"`{t}` {v}" for t, v in changed2.items()))
 
     record3 = run_record(settings, s3.run_id)
     ingest3 = record3.get("stages", {}).get("ingest_source", {})
@@ -283,6 +290,9 @@ def main() -> int:
     written_by_retry = ingest3.get("details", {}).get("batches_written_this_run")
     s3.checks["the retry wrote only the remaining batches (total - 2)"] = (
         batches_total is not None and written_by_retry == batches_total - 2)
+    changed3 = load_changes(record3)
+    s3.checks["after the full refresh the load changed 0 rows (staging and curated rebuilt identically)"] = (
+        bool(changed3) and all(v == (0, 0, 0) for v in changed3.values()))
     s3.notes.append(f"Run record: ingest_source attempts = {ingest3.get('attempts')}, batches written by the "
                     f"retry = {written_by_retry} of {batches_total}.")
 
@@ -377,9 +387,11 @@ def main() -> int:
                       [[f"`{n}`", hashes_after[n][:16], "yes" if hashes_after[n] == hashes_before[n] else "NO"]
                        for n in WATCHED_OUTPUTS])
     lines += ["", "## Screenshots", "",
-              "Taken by hand in the Airflow UI (http://localhost:8080) after the script finished.", "",
-              "![Graph view of the DAG](airflow_graph.png)", "",
-              "![Grid view with the four demo runs](airflow_grid.png)", ""]
+              "Taken in the Airflow UI (http://localhost:8080) after the script finished.", "",
+              "Graph view - the ten tasks and their dependencies:", "", "![Graph view](airflow_graph.png)", "",
+              "Grid view - the four demo runs, one column per run:", "", "![Grid view](airflow_grid.png)", "",
+              f"`ingest_source` in `{s4.run_id}` - tries 1-3 failed (source missing), try 4 succeeded "
+              "after the fix:", "", "![Task tries](airflow_task_tries.png)", ""]
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text("\n".join(lines), encoding="utf-8")
     print(f"wrote {OUTPUT.relative_to(ROOT)} - {'all checks passed' if all_ok else 'SOME CHECKS FAILED'}")
