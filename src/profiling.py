@@ -295,18 +295,19 @@ def write_profile(settings: Settings, profile: dict[str, Any]) -> tuple[Path, Pa
     json_path = settings.file_setting("source.profile_json")
     md_path = settings.file_setting("source.profile_markdown")
     json_path.parent.mkdir(parents=True, exist_ok=True)
-    json_path.write_text(json.dumps(profile, indent=2) + "\n", encoding="utf-8")
+    json_path.write_text(json.dumps(profile, indent=2) + "\n", encoding="utf-8", newline="\n")
 
     generated = f"{BEGIN_MARK}\n{render_markdown(profile)}\n{END_MARK}"
     if md_path.is_file() and BEGIN_MARK in md_path.read_text(encoding="utf-8"):
         current = md_path.read_text(encoding="utf-8")
         before = current.split(BEGIN_MARK, 1)[0]
         after = current.split(END_MARK, 1)[1] if END_MARK in current else "\n"
-        md_path.write_text(before + generated + after, encoding="utf-8")
+        md_path.write_text(before + generated + after, encoding="utf-8", newline="\n")
     else:
         md_path.write_text(
             "# Source profile — industrial_fire_risk_data.csv\n\n"
             "## Generated profile\n\n" + generated + "\n\n## Interpretation\n\n(write notes here)\n",
             encoding="utf-8",
+            newline="\n",
         )
     return json_path, md_path

@@ -115,7 +115,7 @@ def run_benchmark(settings: Settings, run_id: str, log: StageLogger) -> dict[str
     def select_csv() -> pd.DataFrame:
         frame = read_csv()          # CSV has no index or pushdown: read all, then filter
         return frame[(frame["factory"] == factory) & (frame["reading_ts"] >= start_ts)]
-    results.append(_bench_file("CSV", csv_path, lambda: curated.to_csv(csv_path, index=False),
+    results.append(_bench_file("CSV", csv_path, lambda: curated.to_csv(csv_path, index=False, lineterminator="\n"),
                                read_csv, select_csv, expected, write_repeats, read_repeats, warmup))
 
     # --- JSON Lines ----------------------------------------------------------
@@ -165,7 +165,8 @@ def run_benchmark(settings: Settings, run_id: str, log: StageLogger) -> dict[str
         "results": results,
     }
     settings.benchmark_dir.mkdir(parents=True, exist_ok=True)
-    (settings.benchmark_dir / "benchmark_results.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+    (settings.benchmark_dir / "benchmark_results.json").write_text(json.dumps(report, indent=2),
+                                                                   encoding="utf-8", newline="\n")
     write_report_markdown(settings)
     return report
 
@@ -293,7 +294,8 @@ def partition_demo(settings: Settings, run_id: str, log: StageLogger, year: int 
     log.event("partition_demo", f"Partition {result['partition']}: {result['rows_from_partition']:,} rows "
               f"from {len(fragments)} file(s); counts agree: {result['row_counts_agree']}")
     settings.benchmark_dir.mkdir(parents=True, exist_ok=True)
-    (settings.benchmark_dir / "partition_demo.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
+    (settings.benchmark_dir / "partition_demo.json").write_text(json.dumps(result, indent=2),
+                                                                encoding="utf-8", newline="\n")
     if not result["row_counts_agree"]:
         raise DataQualityError(f"Partition row counts disagree: {result}")
     write_report_markdown(settings)
@@ -368,9 +370,9 @@ def write_report_markdown(settings: Settings) -> Path:
         text = path.read_text(encoding="utf-8")
         before, rest = text.split(BEGIN_MARK, 1)
         after = rest.split(END_MARK, 1)[1] if END_MARK in rest else "\n"
-        path.write_text(before + generated + after, encoding="utf-8")
+        path.write_text(before + generated + after, encoding="utf-8", newline="\n")
     else:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("# Storage benchmark report\n\n## Measurements\n\n" + generated +
-                        "\n\n## Interpretation\n\n(write notes here)\n", encoding="utf-8")
+                        "\n\n## Interpretation\n\n(write notes here)\n", encoding="utf-8", newline="\n")
     return path

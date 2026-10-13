@@ -146,7 +146,7 @@ class Checkpoint:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         state["updated_at_utc"] = utc_now_iso()
         tmp = self.path.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps(state, indent=2), encoding="utf-8")
+        tmp.write_text(json.dumps(state, indent=2), encoding="utf-8", newline="\n")
         os.replace(tmp, self.path)   # atomic on the same filesystem
 
 
@@ -354,7 +354,7 @@ def ingest(
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps({"pipeline_run_id": run_id, "ingested_at_utc": ingested_at,
                                          "source_file": settings.source_file.name, **summary}, indent=2),
-                             encoding="utf-8")
+                             encoding="utf-8", newline="\n")
     if not written:
         log.event("nothing_to_ingest", "No pending batches - raw layer already up to date",
                   raw_rows=total_rows)

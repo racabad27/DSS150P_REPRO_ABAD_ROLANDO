@@ -317,7 +317,7 @@ def train_models(settings: Settings, run_id: str, log: StageLogger, input_source
     manifest = build_split_manifest(settings, curated, train, test, X_train, y_train, X_test, y_test)
     manifest_path = settings.file_setting("reproducibility.split_manifest_file")
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8", newline="\n")
     log.event("split_written", f"Chronological split: {len(train):,} train / {len(test):,} test, "
               f"boundary {manifest['test_period']['start']}", train_rows=len(train), test_rows=len(test))
 
@@ -349,7 +349,8 @@ def train_models(settings: Settings, run_id: str, log: StageLogger, input_source
             "file_size_bytes": path.stat().st_size,
         }
         log.event("model_trained", f"{name} trained and saved ({path.stat().st_size / 1e6:.1f} MB)", model=name)
-    (settings.model_dir / "model_card.json").write_text(json.dumps(card, indent=2) + "\n", encoding="utf-8")
+    (settings.model_dir / "model_card.json").write_text(json.dumps(card, indent=2) + "\n",
+                                                        encoding="utf-8", newline="\n")
     return {"train_rows": int(len(train)), "test_rows": int(len(test)), "models": list(card["models"]),
             "split_manifest": manifest_path.relative_to(settings.root).as_posix() if settings.root in manifest_path.parents
             else str(manifest_path)}

@@ -14,7 +14,6 @@ the UNIQUE (reading_ts) constraint make a duplicate physically impossible.
 from __future__ import annotations
 
 import hashlib
-import io
 import json
 import logging
 import re
@@ -82,7 +81,7 @@ def apply_schema(conn: psycopg.Connection, settings: Settings) -> None:
 # ---------------------------------------------------------------------------
 def frame_to_csv(frame: pd.DataFrame) -> str:
     """CSV text for COPY. Floats keep full precision; missing values become empty."""
-    return frame.to_csv(index=False, header=False, na_rep="")
+    return frame.to_csv(index=False, header=False, na_rep="", lineterminator="\n")
 
 
 def merge_snapshot(conn: psycopg.Connection, frame: pd.DataFrame, table: str,

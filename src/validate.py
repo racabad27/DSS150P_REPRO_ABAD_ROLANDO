@@ -25,7 +25,7 @@ import numpy as np
 import pandas as pd
 
 from src.config import Settings
-from src.contract import Contract, load_contract, load_manifest
+from src.contract import Contract, load_manifest
 from src.errors import DataQualityError
 from src.ingest import AUDIT_COLUMNS as RAW_AUDIT_COLUMNS
 from src.observability import StageLogger, utc_now_iso
@@ -90,8 +90,8 @@ class QualityReport:
     def save(self, settings: Settings) -> None:
         settings.quality_dir.mkdir(parents=True, exist_ok=True)
         text = json.dumps(self.to_dict(), indent=2, default=str)
-        (settings.quality_dir / f"{self.run_id}_{self.layer}.json").write_text(text, encoding="utf-8")
-        (settings.quality_dir / f"latest_{self.layer}.json").write_text(text, encoding="utf-8")
+        (settings.quality_dir / f"{self.run_id}_{self.layer}.json").write_text(text, encoding="utf-8", newline="\n")
+        (settings.quality_dir / f"latest_{self.layer}.json").write_text(text, encoding="utf-8", newline="\n")
 
     def log_results(self, log: StageLogger) -> None:
         for result in self.results:

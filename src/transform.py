@@ -189,7 +189,7 @@ def build_staging(settings: Settings, run_id: str, log: StageLogger) -> dict[str
 
     rejected = _quarantine_frame(raw, issues, contract, run_id)
     quarantine_path(settings).parent.mkdir(parents=True, exist_ok=True)
-    rejected.to_csv(quarantine_path(settings), index=False)
+    rejected.to_csv(quarantine_path(settings), index=False, lineterminator="\n")
     if len(rejected):
         log.event("rows_quarantined", f"{len(rejected):,} row(s) moved to quarantine",
                   rows=len(rejected), reasons=rejected["reason_code"].value_counts().to_dict())
@@ -296,7 +296,7 @@ def build_curated(settings: Settings, run_id: str, log: StageLogger) -> dict[str
 
     write_parquet_atomic(curated, curated_path(settings))
     settings.curated_dir.mkdir(parents=True, exist_ok=True)
-    exclusions.to_csv(settings.curated_dir / EXCLUSIONS_FILE, index=False)
+    exclusions.to_csv(settings.curated_dir / EXCLUSIONS_FILE, index=False, lineterminator="\n")
     partitions = write_partitions(curated, settings)
     log.event("curated_published", f"Curated dataset published ({len(curated):,} rows, "
               f"{len(exclusions):,} excluded by the baseline rule)", partitions=partitions["partitions"])

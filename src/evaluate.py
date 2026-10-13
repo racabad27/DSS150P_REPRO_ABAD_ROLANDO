@@ -21,7 +21,6 @@ import logging
 import math
 import re
 from importlib import metadata
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -121,17 +120,18 @@ def evaluate_models(settings: Settings, run_id: str, log: StageLogger) -> dict[s
         "libraries": {pkg: metadata.version(pkg) for pkg in ("scikit-learn", "xgboost", "pandas", "numpy")},
     }
     settings.outputs_dir.mkdir(parents=True, exist_ok=True)
-    (settings.outputs_dir / "metrics.json").write_text(json.dumps(metrics, indent=2) + "\n", encoding="utf-8")
+    (settings.outputs_dir / "metrics.json").write_text(json.dumps(metrics, indent=2) + "\n",
+                                                       encoding="utf-8", newline="\n")
 
     predictions["reading_ts"] = pd.to_datetime(predictions["reading_ts"]).dt.strftime("%Y-%m-%d %H:%M:%S")
-    predictions.to_csv(settings.outputs_dir / "predictions.csv", index=False, float_format="%.6f")
+    predictions.to_csv(settings.outputs_dir / "predictions.csv", index=False, float_format="%.6f", lineterminator="\n")
 
     rows = []
     for model_name, values in results["feature_importance"].items():
         ranked = sorted(values.items(), key=lambda item: -item[1])
         rows += [{"model": model_name, "rank": i, "feature": f, "importance": round(v, 6)}
                  for i, (f, v) in enumerate(ranked, start=1)]
-    pd.DataFrame(rows).to_csv(settings.outputs_dir / "feature_importance.csv", index=False)
+    pd.DataFrame(rows).to_csv(settings.outputs_dir / "feature_importance.csv", index=False, lineterminator="\n")
     return {"test_rows": int(len(test)), "prediction_rows": int(len(predictions)),
             "primary": metrics["primary"]}
 
@@ -231,9 +231,9 @@ def reproducibility_check(settings: Settings, run_id: str, log: StageLogger) -> 
         "checks": checks,
     }
     (settings.outputs_dir / "reproducibility_check.json").write_text(json.dumps(report, indent=2) + "\n",
-                                                                    encoding="utf-8")
+                                                                    encoding="utf-8", newline="\n")
     (settings.outputs_dir / "reproducibility_summary.md").write_text(render_summary(report, metrics, expected),
-                                                                    encoding="utf-8")
+                                                                    encoding="utf-8", newline="\n")
     log.event("reproducibility", f"Reproducibility {status}: {summary['passed']} passed, {summary['failed']} failed, "
               f"{summary['accepted_deviations']} accepted deviations; primary {primary['model']} "
               f"{primary['key'].upper()} {primary['reproduced']:.6f} vs baseline {primary['baseline']} "
@@ -394,5 +394,6 @@ def write_run_summary(settings: Settings, run_id: str) -> dict[str, Any]:
         "stages": {name: {"status": s["status"], "duration_s": s.get("duration_s"), "attempts": s.get("attempts")}
                    for name, s in data["stages"].items()},
     }
-    (settings.outputs_dir / "run_summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    (settings.outputs_dir / "run_summary.json").write_text(json.dumps(summary, indent=2) + "\n",
+                                                           encoding="utf-8", newline="\n")
     return summary
