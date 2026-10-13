@@ -63,7 +63,9 @@ def resolve_run_id(explicit: str | None = None) -> str:
     return normalise_run_id(candidate) if candidate else new_run_id()
 
 
+# ---------------------------------------------------------------------------
 # logging
+# ---------------------------------------------------------------------------
 class JsonFormatter(logging.Formatter):
     """One JSON object per line for logs/pipeline.jsonl."""
 
@@ -90,10 +92,10 @@ class JsonFormatter(logging.Formatter):
 
 
 class ConsoleFormatter(logging.Formatter):
-    """Short readable line: time | level | stage | message key=value ..."""
+    """Short readable line: UTC time | level | stage | message key=value ..."""
 
     def format(self, record: logging.LogRecord) -> str:
-        stamp = datetime.fromtimestamp(record.created).strftime("%H:%M:%S")
+        stamp = datetime.fromtimestamp(record.created, timezone.utc).strftime("%H:%M:%SZ")
         stage = getattr(record, "stage", None) or "-"
         fields = getattr(record, "fields", {}) or {}
         extras = " ".join(f"{k}={v}" for k, v in fields.items() if v is not None)
@@ -153,8 +155,9 @@ def setup_logging(settings: Settings, run_id: str, stage: str | None = None) -> 
     return StageLogger(logger, {"run_id": run_id, "stage": stage})
 
 
-
+# ---------------------------------------------------------------------------
 # run records (outputs/runs/<run_id>.json)
+# ---------------------------------------------------------------------------
 COUNT_KEYS = (
     "source_rows", "raw_rows", "raw_batches_committed", "staging_rows",
     "quarantined_rows", "curated_rows", "curated_excluded_rows",

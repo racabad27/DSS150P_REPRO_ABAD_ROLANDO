@@ -1,0 +1,12 @@
+# Store text files with LF endings so shell scripts and configs work inside
+# Linux containers even when the repository is cloned on Windows.
+* text=auto eol=lf
+
+# Never let Git rewrite the bytes of the source dataset: its SHA-256 is part of
+# the data contract (the original file uses CRLF line endings).
+data/source/*.csv -text
+
+# Binary artefacts
+*.parquet binary
+*.png binary
+*.joblib binary

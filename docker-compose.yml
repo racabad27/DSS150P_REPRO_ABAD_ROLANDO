@@ -1,0 +1,62 @@
+# -----------------------------------------------------------------------------
+# Services
+#   postgres  - PostgreSQL 16 for the staging/curated/serving/audit tables
+#   pipeline  - the Python pipeline (one-off container, profile "cli")
+#
+# Usage (from the repository root, after `cp .env.example .env`):
+#   docker compose up -d postgres            # start the database (waits for healthy)
+#   docker compose build pipeline            # build the pipeline image
+#   docker compose run --rm pipeline         # run the whole pipeline (run-all)
+#   docker compose run --rm pipeline python -m src.cli status
+#   docker compose down                      # stop (add -v to also delete the DB volume)
+# -----------------------------------------------------------------------------
+name: dss150p-fire-risk
+
+x-pipeline-environment: &pipeline-environment
+  POSTGRES_HOST: postgres                     # service name on the compose network
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: ${POSTGRES_DB:-firerisk}
+  POSTGRES_USER: ${POSTGRES_USER:-firerisk}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (copy .env.example to .env first)}
+  PIPELINE_LOG_LEVEL: ${PIPELINE_LOG_LEVEL:-INFO}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-firerisk}
+      POSTGRES_USER: ${POSTGRES_USER:-firerisk}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (copy .env.example to .env first)}
+    ports:
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # the pipeline only starts once the server accepts connections
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: dss150p-fire-risk-pipeline:1.0
+    profiles: ["cli"]          # not started by `docker compose up`; use `docker compose run`
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *pipeline-environment
+      PIPELINE_TRIGGER: docker-compose
+    # Same user id as the Airflow container so both can rewrite the files.
+    user: "${AIRFLOW_UID:-50000}:0"
+    volumes:
+      - ./:/app
+    command: ["python", "-m", "src.cli", "run-all"]
+
+volumes:
+  pgdata:

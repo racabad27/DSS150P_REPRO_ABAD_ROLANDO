@@ -1,0 +1,28 @@
+# Keep the build context small and free of secrets / generated files.
+.git
+.env
+.env.*
+!.env.example
+.venv
+venv
+env
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.ipynb_checkpoints
+airflow_home
+
+# data layers and outputs are produced at run time (the source CSV is mounted)
+data/source/*.csv
+data/raw/*
+data/staging/*
+data/curated/*
+data/partitioned/*
+data/quarantine/*
+data/model_input/*
+outputs/model/*
+outputs/runs
+outputs/quality
+outputs/benchmark/files
+state/*
+logs/*
