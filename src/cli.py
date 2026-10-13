@@ -8,6 +8,9 @@ Usage examples (run from the repository root):
     python -m src.cli profile
     python -m src.cli ingest --mode incremental --max-batches 3
     python -m src.cli status
+    python -m src.cli transform
+    python -m src.cli build-curated
+    python -m src.cli run-all
 """
 
 from __future__ import annotations
@@ -25,7 +28,7 @@ from src.contract import verify_source
 from src.errors import PipelineError
 from src.ingest import Checkpoint, clear_raw_layer, raw_status
 from src.observability import resolve_run_id, setup_logging
-from src.pipeline import run_stage
+from src.pipeline import PIPELINE_ORDER, run_all, run_stage
 from src.profiling import profile_source, write_profile
 
 
@@ -152,6 +155,37 @@ def cmd_status(args: argparse.Namespace, settings: Settings) -> int:
 
 
 # ---------------------------------------------------------------------------
+# single stages and the whole pipeline
+# ---------------------------------------------------------------------------
+def _run_single(stage_name: str):
+    def command(args: argparse.Namespace, settings: Settings) -> int:
+        run_id = resolve_run_id(args.run_id)
+        summary = run_stage(stage_name, settings, run_id)
+        print(f"\n{stage_name} finished for run {run_id}")
+        for key, value in summary.items():
+            if not isinstance(value, (dict, list)):
+                print(f"  {key:<26}: {value}")
+        return 0
+    return command
+
+
+def cmd_validate(args: argparse.Namespace, settings: Settings) -> int:
+    stage_name = {"raw": "validate_raw", "curated": "validate_curated"}[args.layer]
+    return _run_single(stage_name)(args, settings)
+
+
+def cmd_run_all(args: argparse.Namespace, settings: Settings) -> int:
+    run_id = resolve_run_id(args.run_id)
+    record = run_all(settings, run_id, mode=args.mode, max_batches=args.max_batches,
+                     fail_after_batches=args.fail_after_batches)
+    print(f"\nRun {run_id} finished with status: {record['status'].upper()}")
+    for key, value in record["counts"].items():
+        print(f"  {key:<24}: {value:,}" if isinstance(value, int) else f"  {key:<24}: {value}")
+    print(f"Run record: {settings.runs_dir / (run_id + '.json')}")
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # argument parsing
 # ---------------------------------------------------------------------------
 def build_parser() -> argparse.ArgumentParser:
@@ -188,6 +222,26 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("reset-raw", help="delete the raw layer and the checkpoint (keeps data/source)")
     p.add_argument("--yes", action="store_true", help="confirm the deletion")
     p.set_defaults(func=cmd_reset)
+
+    p = sub.add_parser("validate", help="run the data-quality checks of one layer")
+    p.add_argument("--layer", choices=["raw", "curated"], required=True)
+    p.add_argument("--run-id", help="pipeline run id (default: generated)")
+    p.set_defaults(func=cmd_validate)
+
+    for name, stage_name, text in [
+        ("transform", "transform_staging", "build the staging layer from raw (+ quarantine)"),
+        ("build-curated", "build_curated", "build the curated layer and its partitions from staging"),
+    ]:
+        p = sub.add_parser(name, help=text)
+        p.add_argument("--run-id", help="pipeline run id (default: generated)")
+        p.set_defaults(func=_run_single(stage_name))
+
+    p = sub.add_parser("run-all", help="run every stage in order: " + " -> ".join(PIPELINE_ORDER))
+    p.add_argument("--mode", choices=["incremental", "full"], default="incremental")
+    p.add_argument("--max-batches", type=int, help="ingest at most N new batches in this run")
+    p.add_argument("--fail-after-batches", type=int, help="failure drill for the ingestion stage")
+    p.add_argument("--run-id", help="pipeline run id (default: generated)")
+    p.set_defaults(func=cmd_run_all)
     return parser
 
 

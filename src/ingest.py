@@ -46,6 +46,7 @@ RAW_FILE_NAME = "fire_risk_raw.parquet"
 BATCH_DIR_PREFIX = "batch_id="
 UNPARSED_BATCH = "unparsed_timestamp"   # rows whose Date/Time cannot be read land here
 FIELD_SEPARATOR = "\x1f"                 # ASCII unit separator, never appears in the data
+NULL_TOKEN = "\\N"                       # how a missing value is spelled inside a row hash
 AUDIT_COLUMNS = [
     "source_row_key", "record_hash", "batch_id", "pipeline_run_id",
     "ingested_at_utc", "source_file", "source_checksum",
@@ -55,13 +56,18 @@ AUDIT_COLUMNS = [
 # ---------------------------------------------------------------------------
 # reading the source and cutting batches
 # ---------------------------------------------------------------------------
+def _as_text(series: pd.Series) -> pd.Series:
+    """Text form of a column for hashing; missing values become the token \\N."""
+    return series.astype("string").fillna(NULL_TOKEN)
+
+
 def row_hashes(frame: pd.DataFrame) -> pd.Series:
-    """SHA-256 of each row's raw text values (column order matters)."""
+    """SHA-256 of each row's values in text form (column order matters)."""
     columns = list(frame.columns)
-    joined = frame[columns[0]].astype(str)
+    joined = _as_text(frame[columns[0]])
     for column in columns[1:]:                       # vectorised string concatenation
-        joined = joined + FIELD_SEPARATOR + frame[column].astype(str)
-    return joined.map(lambda text: hashlib.sha256(text.encode("utf-8")).hexdigest())
+        joined = joined + FIELD_SEPARATOR + _as_text(frame[column])
+    return joined.map(lambda text: hashlib.sha256(text.encode("utf-8")).hexdigest()).astype(str)
 
 
 def content_checksum(record_hashes: pd.Series) -> str:
@@ -130,6 +136,8 @@ class Checkpoint:
             "batch_frequency": None,
             "watermark_reading_ts": None,
             "last_committed_batch_id": None,
+            "source_rows": None,
+            "batches_in_source": None,
             "committed_batches": {},
             "updated_at_utc": None,
         }
@@ -248,6 +256,8 @@ def ingest(
     source["batch_id"] = batch_ids
     ordered = sorted(set(batch_ids) - {UNPARSED_BATCH}) + ([UNPARSED_BATCH] if UNPARSED_BATCH in set(batch_ids) else [])
 
+    state["source_rows"] = int(len(source))
+    state["batches_in_source"] = len(ordered)
     committed = state["committed_batches"]
     pending = [b for b in ordered if b not in committed]
     watermark = pd.Timestamp(state["watermark_reading_ts"]) if state["watermark_reading_ts"] else None
@@ -323,6 +333,8 @@ def ingest(
                 f"Failure drill: run stopped on purpose after {position} committed batch(es). "
                 "Rerun the same command to resume from the checkpoint.")
 
+    if not written and state["committed_batches"]:
+        checkpoint.save(state)       # keep source_rows / batches_in_source up to date
     total_rows = sum(b["rows"] for b in state["committed_batches"].values())
     summary = {
         "mode": mode,
