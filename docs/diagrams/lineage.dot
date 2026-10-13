@@ -1,0 +1,113 @@
+// Data lineage: source fields -> raw -> staging -> curated -> model features -> model -> outputs.
+// Render: python scripts/render_diagrams.py   (needs Graphviz "dot")
+digraph lineage {
+  graph [rankdir=TB, fontname="Helvetica", fontsize=20, labelloc=t, pad=0.4, nodesep=0.35, ranksep=0.5,
+         newrank=true, label="Data lineage — from the source CSV to predictions and metrics\n "];
+  node  [shape=plain, fontname="Helvetica", fontsize=10];
+  edge  [fontname="Helvetica", fontsize=9, color="#52525b", arrowsize=0.7];
+
+  source [label=<
+    <table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#fee2e2" color="#b91c1c">
+      <tr><td colspan="2"><b>SOURCE</b> data/source/industrial_fire_risk_data.csv</td></tr>
+      <tr><td align="left">100,000 rows · 20 columns</td><td align="left">SHA-256 5db607c5…14f309ba</td></tr>
+      <tr><td align="left" port="dt">Date, Time</td><td align="left">text, YYYY-MM-DD / HH:MM:SS</td></tr>
+      <tr><td align="left" port="cat">Factory, Region, Shift, Exp, Training, Alarm</td><td align="left">categories</td></tr>
+      <tr><td align="left" port="num">Workers, Temp, Pressure, Humidity, Vibration, Speed,<br/>Age, Service_Days, Gas, Sparks</td><td align="left">numbers (Workers 2% blank)</td></tr>
+      <tr><td align="left" port="risk">Risk</td><td align="left">target, 0–100</td></tr>
+      <tr><td align="left" port="acc">Accident</td><td align="left">0/1, = Risk &gt; 75 (leakage)</td></tr>
+    </table>>];
+
+  raw [label=<
+    <table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#e0f2fe" color="#0369a1">
+      <tr><td colspan="2"><b>RAW</b> data/raw/batch_id=YYYYQn/fire_risk_raw.parquet · 12 batches · 100,000 rows</td></tr>
+      <tr><td align="left">20 source columns</td><td align="left">kept as text, unchanged</td></tr>
+      <tr><td align="left">source_row_key</td><td align="left">← row number in the source file</td></tr>
+      <tr><td align="left">record_hash</td><td align="left">← SHA-256 of the 20 raw values</td></tr>
+      <tr><td align="left">batch_id</td><td align="left">← quarter of Date + Time</td></tr>
+      <tr><td align="left">pipeline_run_id, ingested_at_utc, source_file, source_checksum</td><td align="left">audit</td></tr>
+    </table>>];
+
+  checkpoint [shape=note, style=filled, fillcolor="#fef9c3", color="#a16207", fontsize=10,
+              label="state/ingestion_checkpoint.json\nwatermark = latest committed reading_ts"];
+
+  staging [label=<
+    <table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#e0f2fe" color="#0369a1">
+      <tr><td colspan="2"><b>STAGING</b> data/staging/fire_risk_staging.parquet → staging.fire_risk_readings · 100,000 rows</td></tr>
+      <tr><td align="left">reading_ts</td><td align="left">← Date + Time (timestamp, business key)</td></tr>
+      <tr><td align="left">factory … accident (18 columns)</td><td align="left">← same fields, snake_case, typed (workers nullable)</td></tr>
+      <tr><td align="left">source_row_key, record_hash, batch_id, ingested_at_utc</td><td align="left">← carried from raw</td></tr>
+      <tr><td align="left">row_hash, pipeline_run_id, processed_at_utc</td><td align="left">← added (change detection, audit)</td></tr>
+    </table>>];
+
+  quarantine [label=<
+    <table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#fee2e2" color="#b91c1c">
+      <tr><td><b>QUARANTINE</b> data/quarantine/rejected_rows.csv</td></tr>
+      <tr><td align="left">raw values + reason_code, rule_ids, reason_detail<br/>(0 rows for the real source)</td></tr>
+    </table>>];
+
+  curated [label=<
+    <table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#e0f2fe" color="#0369a1">
+      <tr><td colspan="2"><b>CURATED</b> data/curated/fire_risk_curated.parquet → curated.fire_risk_features · 98,000 rows</td></tr>
+      <tr><td align="left">all staging business columns</td><td align="left">rows with workers present only</td></tr>
+      <tr><td align="left">hour_of_day, day_of_week, is_weekend, month</td><td align="left">← reading_ts</td></tr>
+      <tr><td align="left">workers_sparks_interaction</td><td align="left">← workers × sparks</td></tr>
+      <tr><td align="left">temp_pressure_interaction</td><td align="left">← temp × pressure</td></tr>
+      <tr><td align="left">vibration_speed_interaction</td><td align="left">← vibration × speed</td></tr>
+      <tr><td align="left">reading_year, reading_month</td><td align="left">← reading_ts (partition keys)</td></tr>
+    </table>>];
+
+  exclusions [label=<
+    <table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#fef3c7" color="#b45309">
+      <tr><td><b>EXCLUSIONS</b> data/curated/curated_exclusions.csv</td></tr>
+      <tr><td align="left">2,000 rows with blank Workers<br/>(baseline rule: listwise deletion)</td></tr>
+    </table>>];
+
+  partitioned [label=<
+    <table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#e0f2fe" color="#0369a1">
+      <tr><td><b>PARTITIONED</b> data/partitioned/fire_risk_curated/</td></tr>
+      <tr><td align="left">reading_year=YYYY/reading_month=M/part-0.parquet (35 files)</td></tr>
+    </table>>];
+
+  features [label=<
+    <table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#ede9fe" color="#6d28d9">
+      <tr><td colspan="2"><b>MODEL INPUT</b> data/model_input/train.parquet (78,400) · test.parquet (19,600)</td></tr>
+      <tr><td align="left">17 numeric + derived columns</td><td align="left">← curated, unchanged</td></tr>
+      <tr><td align="left">training_encoded, alarm_encoded, exp_encoded</td><td align="left">← Yes=1 · On=1 · Senior=1</td></tr>
+      <tr><td align="left">factory_factory_b/c/d, region_rural/urban, shift_night</td><td align="left">← one-hot, first category dropped</td></tr>
+      <tr><td align="left">26 features in notebook order · target = risk</td><td align="left">accident and audit columns excluded</td></tr>
+      <tr><td align="left">split: first 80% by reading_ts → train</td><td align="left">→ metadata/split_manifest.json</td></tr>
+    </table>>];
+
+  models [label=<
+    <table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#f4f4f5" color="#52525b">
+      <tr><td><b>MODELS</b> outputs/model/</td></tr>
+      <tr><td align="left">linear_regression.joblib · random_forest.joblib (100 trees, seed 42)<br/>xgboost.json (100 trees, seed 42) · model_card.json</td></tr>
+    </table>>];
+
+  outputs [label=<
+    <table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#dcfce7" color="#15803d">
+      <tr><td colspan="2"><b>OUTPUTS</b></td></tr>
+      <tr><td align="left">outputs/metrics.json</td><td align="left">test + CV metrics, importances, coefficients</td></tr>
+      <tr><td align="left">outputs/predictions.csv → serving.risk_predictions</td><td align="left">19,600 test rows × 3 models</td></tr>
+      <tr><td align="left">outputs/reproducibility_check.json</td><td align="left">156 checks vs expected_metrics.json</td></tr>
+      <tr><td align="left">outputs/run_summary.json → audit.*</td><td align="left">counts, stage timings, status</td></tr>
+    </table>>];
+
+  expected [shape=note, style=filled, fillcolor="#fef9c3", color="#a16207", fontsize=10,
+            label="metadata/expected_metrics.json\n(paper + notebook baseline)"];
+
+  source -> raw [label=" ingest_source\n(full | incremental)"];
+  raw -> checkpoint [style=dashed, label=" advance"];
+  raw -> staging [label=" transform_staging\n(contract types, formats, rules)"];
+  staging -> quarantine [style=dashed, color="#b91c1c", fontcolor="#b91c1c", label=" rule breakers"];
+  staging -> curated [label=" build_curated\n(complete cases + features)"];
+  curated -> exclusions [style=dashed, color="#b45309", fontcolor="#b45309", label=" excluded rows"];
+  curated -> partitioned [style=dashed, label=" same rows, split by\n year and month"];
+  curated -> features [label=" train_model\n(read ORDER BY reading_ts)"];
+  features -> models [label=" fit on train"];
+  models -> outputs [label=" evaluate_model, publish_outputs"];
+  expected -> outputs [style=dashed, label=" reproducibility_check"];
+
+  { rank=same; staging; quarantine; }
+  { rank=same; curated; exclusions; }
+}
